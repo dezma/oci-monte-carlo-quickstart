@@ -1,0 +1,7 @@
+apiVersion: v2
+name: monte-carlo
+description: Security-first, reproducible Monte Carlo Indexed Jobs for OCI OKE
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.24.0-0"

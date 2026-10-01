@@ -1,0 +1,62 @@
+# Copy this file to terraform.tfvars. Never commit the resulting file.
+tenancy_ocid     = "ocid1.tenancy.oc1..replace-me"
+compartment_ocid = "ocid1.compartment.oc1..replace-me"
+region           = "us-ashburn-1"
+
+name_prefix = "mcqs"
+
+# Terraform creates a private operator workstation and an OCI Bastion service.
+# The operator subnet is the sole CIDR permitted to reach the private OKE API.
+operator_subnet_cidr = "10.42.48.0/28"
+bastion_subnet_cidr  = "10.42.49.0/28"
+
+# Required: public client range permitted to create an OCI Bastion session.
+# This is your corporate VPN or workstation public address—not a Cloud Shell CIDR.
+bastion_client_cidr = "203.0.113.25/32"
+
+# Required in Resource Manager: select a supported Kubernetes minor or exact patch
+# and a compatible node image before provisioning. This must be a full OKE patch
+# version listed by ../provisioning/list-oke-options.sh.
+kubernetes_version = "v1.36.1"
+node_image_id      = "ocid1.image.oc1..replace-me"
+
+# Explicitly match the architecture of node_image_id. Do not infer architecture
+# from node_shape: choose amd64 for Intel/AMD images or arm64 for Ampere images.
+node_architecture = "amd64"
+
+# Run ../provisioning/list-shapes.sh first. Flex shapes require OCPU and memory values.
+# Current examples: VM.Standard.E6.Flex, VM.Standard4.Ax.Flex, VM.Standard.A4.Ax.Flex.
+node_shape            = "VM.Standard.E6.Flex"
+node_shape_ocpus      = 2
+node_shape_memory_gbs = 16
+node_pool_size         = 2
+max_pods_per_node      = 31
+
+# For fixed shapes, set both values to null:
+# node_shape = "BM.HPC.E5.144"
+# node_shape_ocpus = null
+# node_shape_memory_gbs = null
+
+# Private operator workstation. It is accessed only using an OCI Bastion Managed
+# SSH session and is the only host that runs kubectl, Helm, and quickstart scripts.
+# Leave the shape unset to choose VM.Standard.A4.Flex for arm64 workers or
+# VM.Standard.E5.Flex for amd64 workers. An override must match its image architecture.
+# operator_shape = "VM.Standard.E5.Flex"
+operator_shape_ocpus      = 1
+operator_shape_memory_gbs = 8
+operator_boot_volume_gbs  = 50
+
+# Optional: use a customer-managed Object Storage encryption key from OCI Vault.
+# kms_key_id = "ocid1.key.oc1..replace-me"
+
+# The workload identity can only create result objects below this prefix.
+object_storage_prefix = "monte-carlo"
+
+# Optional: override the derived <region-key>.ocir.io registry domain for a
+# realm-specific endpoint. Do not include https:// or a repository path.
+# ocir_registry = "ocir.us-ashburn-1.oci.oraclecloud.com"
+
+freeform_tags = {
+  CostCenter = "replace-me"
+  Owner      = "replace-me"
+}

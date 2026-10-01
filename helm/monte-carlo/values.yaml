@@ -1,0 +1,59 @@
+namespace:
+  create: true
+  name: monte-carlo
+
+serviceAccount:
+  # The baseline release creates and owns this account. Per-run releases reuse it.
+  create: true
+  name: monte-carlo-runner
+
+image:
+  repository: ""
+  # Required for a submitted job. Example: sha256:0123...; mutable tags are intentionally unsupported.
+  digest: ""
+  pullSecrets:
+    - name: ocir-pull
+
+objectStorage:
+  bucket: ""
+  namespace: ""
+  prefix: monte-carlo
+  region: ""
+
+nodeSelector: {}
+tolerations: []
+
+networkPolicy:
+  enabled: true
+
+run:
+  enabled: false
+  id: example
+  specJson: ""
+  parallelism: 4
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  ttlSecondsAfterFinished: 3600
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL

@@ -1,0 +1,241 @@
+schemaVersion: 1.1.0
+locale: en
+variableGroups:
+  - title: Required configuration
+    variables:
+      - tenancy_ocid
+      - compartment_ocid
+      - region
+  - title: Network and access
+    variables:
+      - name_prefix
+      - vcn_cidr
+      - api_subnet_cidr
+      - worker_subnet_cidr
+      - pod_subnet_cidr
+      - service_lb_subnet_cidr
+      - operator_subnet_cidr
+      - bastion_subnet_cidr
+      - bastion_client_cidr
+  - title: Compute and Kubernetes
+    variables:
+      - availability_domain
+      - kubernetes_version
+      - node_architecture
+      - node_shape
+      - node_shape_ocpus
+      - node_shape_memory_gbs
+      - node_pool_size
+      - max_pods_per_node
+      - node_image_id
+  - title: Private operator workstation
+    variables:
+      - operator_shape
+      - operator_shape_ocpus
+      - operator_shape_memory_gbs
+      - operator_boot_volume_gbs
+      - operator_image_id
+      - operator_helm_version
+  - title: Workload security
+    variables:
+      - kubernetes_namespace
+      - service_account_name
+      - object_storage_bucket_name
+      - object_storage_prefix
+      - ocir_registry
+      - kms_key_id
+      - freeform_tags
+variables:
+  tenancy_ocid:
+    type: oci:identity:tenancy:id
+    title: Tenancy
+    required: true
+  compartment_ocid:
+    type: oci:identity:compartment:id
+    title: Deployment compartment
+    required: true
+  region:
+    type: oci:identity:region:name
+    title: Region
+    required: true
+  name_prefix:
+    type: string
+    title: Resource prefix
+    default: mcqs
+    required: true
+  vcn_cidr:
+    type: string
+    default: 10.42.0.0/16
+    required: true
+  api_subnet_cidr:
+    type: string
+    default: 10.42.0.0/28
+    required: true
+  worker_subnet_cidr:
+    type: string
+    default: 10.42.1.0/24
+    required: true
+  pod_subnet_cidr:
+    type: string
+    default: 10.42.16.0/20
+    required: true
+  service_lb_subnet_cidr:
+    type: string
+    default: 10.42.32.0/24
+    required: true
+  operator_subnet_cidr:
+    type: string
+    title: Private operator subnet CIDR
+    description: Terraform creates this subnet for the private operator instance. Only this CIDR may reach the private OKE API.
+    default: 10.42.48.0/28
+    required: true
+  bastion_subnet_cidr:
+    type: string
+    title: OCI Bastion endpoint subnet CIDR
+    description: Terraform creates this dedicated private subnet for OCI Bastion service endpoints.
+    default: 10.42.49.0/28
+    required: true
+  bastion_client_cidr:
+    type: string
+    title: Bastion client CIDR
+    description: Required public workstation or corporate VPN CIDR permitted to create Bastion sessions; for one workstation use its public IPv4 address with /32.
+    required: true
+  availability_domain:
+    type: string
+    title: Availability Domain
+    required: false
+  kubernetes_version:
+    type: string
+    title: Kubernetes version
+    description: Required. Defaults to the v1.36.1 OKE patch release. Select a full version returned by provisioning/list-oke-options.sh before creating the stack; minor-only values such as v1.36 are not valid.
+    default: v1.36.1
+    required: true
+  node_architecture:
+    type: string
+    title: OKE worker architecture
+    description: Select amd64 for Intel or AMD worker images, or arm64 for Ampere worker images. The operator uses this explicit value for native image builds and job defaults rather than inferring it from the shape name.
+    default: amd64
+    required: true
+  node_shape:
+    type: string
+    title: OKE worker node shape
+    description: Discover available shapes with provisioning/list-shapes.sh. The shape must be available in the selected Availability Domain.
+    default: VM.Standard.E6.Flex
+    required: true
+  node_shape_ocpus:
+    type: number
+    default: 2
+    required: false
+  node_shape_memory_gbs:
+    type: number
+    default: 16
+    required: false
+  node_pool_size:
+    type: number
+    default: 2
+    required: true
+  max_pods_per_node:
+    type: number
+    default: 31
+    required: true
+  node_image_id:
+    type: string
+    title: OKE node image OCID
+    description: Required. Select an image OCID compatible with the chosen Kubernetes version and node architecture using provisioning/list-oke-options.sh.
+    required: true
+  operator_shape:
+    type: string
+    title: Operator instance shape override
+    description: Optional. Leave empty to choose VM.Standard.A4.Flex for arm64 worker targets or VM.Standard.E5.Flex for amd64 worker targets. Any override must be a compatible flexible shape and image architecture.
+    required: false
+  operator_shape_ocpus:
+    type: number
+    default: 1
+    required: true
+  operator_shape_memory_gbs:
+    type: number
+    default: 8
+    required: true
+  operator_boot_volume_gbs:
+    type: number
+    default: 50
+    required: true
+  operator_image_id:
+    type: string
+    title: Operator image OCID override
+    description: Optional. Leave empty to use the newest available Oracle Linux 8 platform image compatible with the resolved operator shape and architecture.
+    required: false
+  operator_helm_version:
+    type: string
+    title: Pinned Helm version
+    default: v3.17.3
+    required: true
+  kubernetes_namespace:
+    type: string
+    default: monte-carlo
+    required: true
+  service_account_name:
+    type: string
+    default: monte-carlo-runner
+    required: true
+  object_storage_bucket_name:
+    type: string
+    required: false
+  object_storage_prefix:
+    type: string
+    title: Write-only result prefix
+    description: The workload identity can only create partial-result objects below this prefix.
+    default: monte-carlo
+    required: true
+  ocir_registry:
+    type: string
+    title: OCIR registry domain override
+    description: Optional realm-specific registry domain without a scheme or repository path.
+    required: false
+  kms_key_id:
+    type: string
+    required: false
+  freeform_tags:
+    type: string
+    required: false
+outputs:
+  cluster_id:
+    title: OKE cluster OCID
+  region:
+    title: OCI region
+  cluster_name:
+    title: OKE cluster name
+  cluster_endpoint:
+    title: Private Kubernetes API endpoint
+  operator_instance_id:
+    title: Operator instance OCID
+  operator_private_ip:
+    title: Operator private IP
+  operator_user:
+    title: Operator Linux user
+  operator_workspace:
+    title: Operator quickstart workspace
+  bastion_id:
+    title: OCI Bastion OCID
+  bastion_client_cidr:
+    title: Allowed Bastion client CIDR
+  operator_session_create_command:
+    title: Create operator SSH session
+  node_pool_id:
+    title: Node pool OCID
+  node_shape:
+    title: Selected node shape
+  node_architecture:
+    title: Selected node architecture
+  operator_shape:
+    title: Selected operator shape
+  object_storage_bucket:
+    title: Private result bucket
+  object_storage_namespace:
+    title: Object Storage namespace
+  object_storage_prefix:
+    title: Write-only result prefix
+  container_repository_url:
+    title: OCIR repository URL
+  log_group_id:
+    title: Log group OCID

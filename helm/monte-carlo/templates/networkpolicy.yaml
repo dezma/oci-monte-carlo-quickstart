@@ -1,0 +1,38 @@
+{{- if and .Values.networkPolicy.enabled (not .Values.run.enabled) }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "monte-carlo.fullname" . }}-default-deny
+  namespace: {{ include "monte-carlo.namespace" . }}
+  labels:
+    {{- include "monte-carlo.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "monte-carlo.fullname" . }}-controlled-egress
+  namespace: {{ include "monte-carlo.namespace" . }}
+  labels:
+    {{- include "monte-carlo.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "monte-carlo.name" . }}
+      app.kubernetes.io/component: simulator
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

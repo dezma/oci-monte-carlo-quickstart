@@ -1,0 +1,12 @@
+.git
+.gitignore
+.venv
+.pytest_cache
+.ruff_cache
+dist
+terraform
+helm
+cloudshell
+tests
+examples
+*.md

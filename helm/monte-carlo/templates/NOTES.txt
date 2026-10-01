@@ -1,0 +1,9 @@
+{{- if .Values.run.enabled }}
+Simulation Job {{ include "monte-carlo.runName" . }} was submitted in namespace {{ include "monte-carlo.namespace" . }}.
+
+It uses the supplied immutable image digest and the baseline-owned ServiceAccount {{ .Values.serviceAccount.name }}.
+{{- else }}
+The secure runtime baseline is installed in namespace {{ include "monte-carlo.namespace" . }}.
+
+No simulation job was submitted. Use operator/run-example.sh to create a uniquely named, immutable Indexed Job.
+{{- end }}

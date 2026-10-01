@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec > >(tee -a /var/log/mcqs-operator-bootstrap.log) 2>&1
+
+BOOTSTRAP_STATUS_DIR=/var/lib/mcqs
+BOOTSTRAP_STATUS_FILE="$BOOTSTRAP_STATUS_DIR/operator-bootstrap-status.json"
+BOOTSTRAP_READY_FILE=/home/opc/.mcqs-operator-ready
+BOOTSTRAP_COMPLETE=false
+
+write_bootstrap_status() {
+  local state="$1"
+  local exit_code="$2"
+  install -d -m 0755 "$BOOTSTRAP_STATUS_DIR"
+  printf '{"state":"%s","timestamp":"%s","exit_code":%s}\n' \
+    "$state" "$(date -u +%FT%TZ)" "$exit_code" >"$BOOTSTRAP_STATUS_FILE"
+  chmod 0644 "$BOOTSTRAP_STATUS_FILE"
+}
+
+bootstrap_exit() {
+  local exit_code="$?"
+  if [[ "$BOOTSTRAP_COMPLETE" != true ]]; then
+    # Preserve the original bootstrap failure even if status persistence fails.
+    set +e
+    write_bootstrap_status "failed" "$exit_code"
+  fi
+}
+
+trap bootstrap_exit EXIT
+rm -f "$BOOTSTRAP_READY_FILE"
+write_bootstrap_status "in-progress" null
+export OCI_REGION='${region}'
+export OCI_CLI_AUTH=instance_principal
+
+# The operator may be arm64 when the selected worker target is arm64. Download
+# client binaries for this host, not for a worker-shape heuristic.
+case "$(uname -m)" in
+  x86_64|amd64)
+    OPERATOR_BINARY_ARCHITECTURE=amd64
+    ;;
+  aarch64|arm64)
+    OPERATOR_BINARY_ARCHITECTURE=arm64
+    ;;
+  *)
+    echo "Unsupported operator architecture: $(uname -m)"
+    exit 1
+    ;;
+esac
+
+# Oracle Linux 8 ships Python 3.6 as `python3`.  Keep that system runtime intact
+# and use the versioned Python 3.12 runtime for this project's dependencies.
+# The OCI CLI package is named python36-oci-cli on Oracle Linux 8.
+dnf -y install \
+  oraclelinux-developer-release-el8 \
+  dnf-plugins-core \
+  curl git gzip jq tar unzip \
+  python36-oci-cli \
+  python3.12 python3.12-pip python3.12-setuptools python3.12-wheel
+dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+systemctl enable --now docker
+usermod -aG docker opc
+
+install -d -m 0700 -o opc -g opc /home/opc/.kube
+install -d -m 0750 -o opc -g opc /home/opc/oci-monte-carlo-quickstart
+
+cat >/etc/profile.d/mcqs-runtime.sh <<'ENVIRONMENT'
+export OCI_CLI_AUTH=instance_principal
+export CLUSTER_ID='${cluster_id}'
+export OCI_REGION='${region}'
+export REGION='${region}'
+export MCQS_OBJECT_STORAGE_BUCKET='${bucket_name}'
+export MCQS_OBJECT_STORAGE_NAMESPACE='${namespace}'
+export MCQS_OBJECT_STORAGE_PREFIX='${object_storage_prefix}'
+export MCQS_IMAGE_REPOSITORY='${image_repository}'
+export MCQS_NAMESPACE='${kubernetes_namespace}'
+export MCQS_SERVICE_ACCOUNT='${service_account_name}'
+export MCQS_NODE_ARCHITECTURE='${node_architecture}'
+export OCI_TENANCY_NAMESPACE='${namespace}'
+export KUBECONFIG=/home/opc/.kube/config
+export MCQS_PYTHON=/home/opc/.mcqs-venv/bin/python
+ENVIRONMENT
+chmod 0644 /etc/profile.d/mcqs-runtime.sh
+
+BUNDLE_FILE=/tmp/mcqs-quickstart.tar.gz
+BUNDLE_SHA256='${bundle_sha256}'
+[[ "$BUNDLE_SHA256" =~ ^[a-fA-F0-9]{64}$ ]] || {
+  echo "Terraform did not provide a valid SHA-256 for the operator bundle."
+  exit 1
+}
+
+for attempt in $(seq 1 40); do
+  # The bootstrap bundle is intentionally small. Force one streamed request:
+  # the Oracle Linux 8 packaged CLI's multipart transfer path can fail with a
+  # misleading 404 even though the object is present and authorized.
+  rm -f "$BUNDLE_FILE"
+  if sudo -H -u opc env OCI_CLI_AUTH=instance_principal OCI_REGION="$OCI_REGION" oci os object get \
+    --no-multipart \
+    --region "$OCI_REGION" \
+    --namespace '${namespace}' \
+    --bucket-name '${bucket_name}' \
+    --name '${bundle_name}' \
+    --file "$BUNDLE_FILE" && \
+    test -s "$BUNDLE_FILE" && \
+    tar -tzf "$BUNDLE_FILE" >/dev/null; then
+    break
+  fi
+  if [[ "$attempt" == 40 ]]; then
+    echo "Unable to download the private operator bundle after waiting for IAM propagation."
+    exit 1
+  fi
+  sleep 15
+done
+
+printf '%s  %s\n' "$BUNDLE_SHA256" "$BUNDLE_FILE" | sha256sum --check --status
+tar -tzf "$BUNDLE_FILE" >/dev/null
+tar -xzf "$BUNDLE_FILE" -C /home/opc/oci-monte-carlo-quickstart --strip-components=1
+rm -f "$BUNDLE_FILE"
+chown -R opc:opc /home/opc/oci-monte-carlo-quickstart /home/opc/.kube
+test -d /home/opc/oci-monte-carlo-quickstart/operator
+test -f /home/opc/oci-monte-carlo-quickstart/scripts/lib.sh
+chmod 0750 /home/opc/oci-monte-carlo-quickstart/operator/*.sh
+chmod 0640 /home/opc/oci-monte-carlo-quickstart/scripts/lib.sh
+
+KUBECTL_REQUESTED_VERSION='${kubectl_version}'
+if [[ "$KUBECTL_REQUESTED_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  KUBECTL_VERSION="$KUBECTL_REQUESTED_VERSION"
+elif [[ "$KUBECTL_REQUESTED_VERSION" =~ ^v[0-9]+\.[0-9]+$ ]]; then
+  KUBECTL_MINOR="$${KUBECTL_REQUESTED_VERSION#v}"
+  KUBECTL_VERSION="$(curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+    "https://dl.k8s.io/release/stable-$${KUBECTL_MINOR}.txt")"
+  [[ "$KUBECTL_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$KUBECTL_VERSION" == "$${KUBECTL_REQUESTED_VERSION}."* ]] || {
+    echo "Resolved kubectl version $${KUBECTL_VERSION} does not match requested OKE minor $${KUBECTL_REQUESTED_VERSION}."
+    exit 1
+  }
+else
+  echo "Invalid requested Kubernetes version: $${KUBECTL_REQUESTED_VERSION}"
+  exit 1
+fi
+
+curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+  -o /tmp/kubectl "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/$OPERATOR_BINARY_ARCHITECTURE/kubectl"
+curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+  -o /tmp/kubectl.sha256 "https://dl.k8s.io/release/$${KUBECTL_VERSION}/bin/linux/$OPERATOR_BINARY_ARCHITECTURE/kubectl.sha256"
+KUBECTL_SHA256="$(tr -d '\r\n' </tmp/kubectl.sha256)"
+[[ "$KUBECTL_SHA256" =~ ^[a-fA-F0-9]{64}$ ]] || {
+  echo "kubectl checksum file did not contain a SHA-256 digest."
+  exit 1
+}
+printf '%s  %s\n' "$KUBECTL_SHA256" /tmp/kubectl | sha256sum --check --status
+install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+
+HELM_ARCHIVE="helm-${helm_version}-linux-$OPERATOR_BINARY_ARCHITECTURE.tar.gz"
+curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+  -o /tmp/helm.tar.gz "https://get.helm.sh/$HELM_ARCHIVE"
+curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+  -o /tmp/helm.sha256 "https://get.helm.sh/$HELM_ARCHIVE.sha256sum"
+HELM_SHA256="$(awk -v archive="$HELM_ARCHIVE" '
+  length($1) == 64 && $1 ~ /^[[:xdigit:]]+$/ {
+    filename = $2
+    sub(/^\*/, "", filename)
+    if (filename == archive) {
+      print tolower($1)
+      exit
+    }
+  }
+' /tmp/helm.sha256)"
+[[ "$HELM_SHA256" =~ ^[a-fA-F0-9]{64}$ ]] || {
+  echo "Helm checksum file did not contain a SHA-256 digest for $HELM_ARCHIVE."
+  exit 1
+}
+printf '%s  %s\n' "$HELM_SHA256" /tmp/helm.tar.gz | sha256sum --check --status
+tar -xzf /tmp/helm.tar.gz -C /tmp
+install -m 0755 "/tmp/linux-$OPERATOR_BINARY_ARCHITECTURE/helm" /usr/local/bin/helm
+
+for attempt in $(seq 1 40); do
+  if sudo -H -u opc env OCI_CLI_AUTH=instance_principal OCI_REGION="$OCI_REGION" oci ce cluster create-kubeconfig \
+    --cluster-id '${cluster_id}' \
+    --file /home/opc/.kube/config \
+    --region '${region}' \
+    --token-version 2.0.0 \
+    --kube-endpoint PRIVATE_ENDPOINT \
+    --auth instance_principal \
+    --with-auth-context >/dev/null && \
+    sudo -H -u opc env OCI_CLI_AUTH=instance_principal OCI_REGION="$OCI_REGION" KUBECONFIG=/home/opc/.kube/config /usr/local/bin/kubectl cluster-info >/dev/null; then
+    break
+  fi
+  if [[ "$attempt" == 40 ]]; then
+    echo "The operator could not create a working kubeconfig after waiting for OKE and IAM propagation."
+    exit 1
+  fi
+  sleep 15
+done
+
+sudo -H -u opc bash -lc 'source /etc/profile.d/mcqs-runtime.sh; cd /home/opc/oci-monte-carlo-quickstart; python3.12 -m venv /home/opc/.mcqs-venv; /home/opc/.mcqs-venv/bin/pip install --disable-pip-version-check --no-cache-dir -r requirements.txt; /usr/local/bin/kubectl cluster-info'
+
+touch "$BOOTSTRAP_READY_FILE"
+chown opc:opc "$BOOTSTRAP_READY_FILE"
+chmod 0644 "$BOOTSTRAP_READY_FILE"
+write_bootstrap_status "ready" 0
+BOOTSTRAP_COMPLETE=true
