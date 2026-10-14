@@ -42,7 +42,8 @@ mcqs_require_operator_environment
 GRID_DIRECTORY="$(mktemp -d)"
 MANIFEST_FILE="$GRID_DIRECTORY/manifest.json"
 trap 'rm -rf -- "$GRID_DIRECTORY"' EXIT
-"$MCQS_PYTHON" -m montecarlo.grid render \
+PYTHONPATH="${MCQS_ROOT_DIR}/app${PYTHONPATH:+:${PYTHONPATH}}" \
+  "$MCQS_PYTHON" -m montecarlo.grid render \
   --grid "$GRID_FILE" \
   --output-dir "$GRID_DIRECTORY/scenarios" \
   --max-scenarios "$MAX_SCENARIOS" > "$MANIFEST_FILE"
