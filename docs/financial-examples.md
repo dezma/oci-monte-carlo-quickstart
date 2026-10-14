@@ -49,6 +49,3 @@ For a queue-managed demonstration, install and configure Kueue as a platform-own
 
 The grid launcher submits Jobs without waiting for each one. Kueue decides when queued Jobs are admitted; `operator/grid-status.sh` shows Jobs, Pods, and Kueue Workloads when the Kueue API is present.
 
-## Add a portfolio-risk model next
-
-The next recommended model is a synthetic correlated portfolio loss simulation that reports Value at Risk and Expected Shortfall. Implement it as a separate `product_type` with a dedicated result reducer rather than overloading the option-price result. Validate that its correlation matrix is positive semidefinite, bound the portfolio size, and return an explicit loss unit and quantile convention in every result.
