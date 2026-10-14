@@ -1,0 +1,9 @@
+# Pass with: operator/run-example.sh --values helm/monte-carlo/examples/resilience-values.yaml
+# This overlay is intentionally opt-in. It retries a transient lost worker up
+# to twice per Indexed Job partition, but fails immediately for invalid input.
+run:
+  backoffLimit: 6
+  backoffLimitPerIndex: 2
+  maxFailedIndexes: 0
+  podFailurePolicy:
+    enabled: true

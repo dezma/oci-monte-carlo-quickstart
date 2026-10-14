@@ -1,0 +1,18 @@
+{
+  "run_id": "up-and-out-call-001",
+  "product_type": "up_and_out",
+  "option_type": "call",
+  "barrier": 125.0,
+  "simulations": 200000,
+  "steps": 64,
+  "seed": 20261005,
+  "confidence_level": 0.95,
+  "market": {
+    "spot": 102.0,
+    "strike": 100.0,
+    "risk_free_rate": 0.05,
+    "volatility": 0.25,
+    "maturity_years": 1.0,
+    "dividend_yield": 0.02
+  }
+}

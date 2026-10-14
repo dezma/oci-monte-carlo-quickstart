@@ -1,0 +1,18 @@
+{
+  "run_id": "cash-digital-call-001",
+  "product_type": "cash_digital",
+  "option_type": "call",
+  "cash_payoff": 10.0,
+  "simulations": 200000,
+  "steps": 32,
+  "seed": 20261005,
+  "confidence_level": 0.95,
+  "market": {
+    "spot": 102.0,
+    "strike": 100.0,
+    "risk_free_rate": 0.05,
+    "volatility": 0.25,
+    "maturity_years": 1.0,
+    "dividend_yield": 0.02
+  }
+}

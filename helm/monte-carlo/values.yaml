@@ -32,6 +32,17 @@ run:
   specJson: ""
   parallelism: 4
   backoffLimit: 0
+  # Set these only for the resilience demonstration. The quickstart's normal
+  # path fails fast so input or configuration mistakes are visible immediately.
+  backoffLimitPerIndex: null
+  maxFailedIndexes: null
+  podFailurePolicy:
+    enabled: false
+  # Set queueName when Kueue is installed by the platform team. Empty leaves
+  # the baseline Kubernetes scheduler path unchanged.
+  queueName: ""
+  gridId: ""
+  scenarioId: ""
   activeDeadlineSeconds: 3600
   ttlSecondsAfterFinished: 3600
 

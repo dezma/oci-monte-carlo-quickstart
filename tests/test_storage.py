@@ -1,3 +1,4 @@
+import json
 import sys
 from types import SimpleNamespace
 
@@ -56,3 +57,42 @@ def test_write_result_requires_region_for_object_storage(monkeypatch: pytest.Mon
 
     with pytest.raises(ValueError, match="OCI_REGION is required"):
         write_result(_result())
+
+
+def test_write_result_accepts_matching_immutable_result_from_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result = _result()
+    result["elapsed_seconds"] = 0.1
+    result["completed_at"] = "2026-10-05T00:00:00+00:00"
+    existing = {**result, "elapsed_seconds": 9.9, "completed_at": "2026-10-05T00:01:00+00:00"}
+
+    class PreconditionFailed(Exception):
+        status = 412
+
+    class FakeClient:
+        def __init__(self, config: dict[str, str], signer: object) -> None:
+            pass
+
+        def put_object(self, **kwargs: object) -> None:
+            raise PreconditionFailed()
+
+        def get_object(self, *args: object) -> object:
+            return SimpleNamespace(
+                data=SimpleNamespace(content=json.dumps(existing).encode("utf-8"))
+            )
+
+    fake_oci = SimpleNamespace(
+        auth=SimpleNamespace(
+            signers=SimpleNamespace(
+                get_oke_workload_identity_resource_principal_signer=lambda: object()
+            )
+        ),
+        object_storage=SimpleNamespace(ObjectStorageClient=FakeClient),
+    )
+    monkeypatch.setitem(sys.modules, "oci", fake_oci)
+    monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "results")
+    monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "namespace")
+    monkeypatch.setenv("OCI_REGION", "eu-frankfurt-1")
+
+    assert write_result(result) == "oci://results/monte-carlo/runs/test-run/partials/part-00000.json"

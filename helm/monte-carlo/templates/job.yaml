@@ -11,6 +11,12 @@ metadata:
   labels:
     {{- include "monte-carlo.labels" . | nindent 4 }}
     monte-carlo.oracle.com/run-id: {{ .Values.run.id | quote }}
+    {{- with .Values.run.gridId }}
+    monte-carlo.oracle.com/grid-id: {{ . | quote }}
+    {{- end }}
+    {{- with .Values.run.scenarioId }}
+    monte-carlo.oracle.com/scenario-id: {{ . | quote }}
+    {{- end }}
 immutable: true
 data:
   spec.json: |-
@@ -25,11 +31,38 @@ metadata:
     {{- include "monte-carlo.labels" . | nindent 4 }}
     app.kubernetes.io/component: simulator
     monte-carlo.oracle.com/run-id: {{ .Values.run.id | quote }}
+    {{- with .Values.run.gridId }}
+    monte-carlo.oracle.com/grid-id: {{ . | quote }}
+    {{- end }}
+    {{- with .Values.run.scenarioId }}
+    monte-carlo.oracle.com/scenario-id: {{ . | quote }}
+    {{- end }}
+    {{- with .Values.run.queueName }}
+    kueue.x-k8s.io/queue-name: {{ . | quote }}
+    {{- end }}
 spec:
   completions: {{ .Values.run.parallelism }}
   parallelism: {{ .Values.run.parallelism }}
   completionMode: Indexed
   backoffLimit: {{ .Values.run.backoffLimit }}
+  {{- if ne .Values.run.backoffLimitPerIndex nil }}
+  backoffLimitPerIndex: {{ .Values.run.backoffLimitPerIndex }}
+  {{- end }}
+  {{- if ne .Values.run.maxFailedIndexes nil }}
+  maxFailedIndexes: {{ .Values.run.maxFailedIndexes }}
+  {{- end }}
+  {{- if .Values.run.podFailurePolicy.enabled }}
+  podFailurePolicy:
+    rules:
+      - action: FailJob
+        onExitCodes:
+          containerName: simulator
+          operator: In
+          values: [2]
+      - action: Ignore
+        onPodConditions:
+          - type: DisruptionTarget
+  {{- end }}
   activeDeadlineSeconds: {{ .Values.run.activeDeadlineSeconds }}
   ttlSecondsAfterFinished: {{ .Values.run.ttlSecondsAfterFinished }}
   template:
@@ -38,6 +71,12 @@ spec:
         {{- include "monte-carlo.labels" . | nindent 8 }}
         app.kubernetes.io/component: simulator
         monte-carlo.oracle.com/run-id: {{ .Values.run.id | quote }}
+        {{- with .Values.run.gridId }}
+        monte-carlo.oracle.com/grid-id: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.run.scenarioId }}
+        monte-carlo.oracle.com/scenario-id: {{ . | quote }}
+        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ .Values.serviceAccount.name }}

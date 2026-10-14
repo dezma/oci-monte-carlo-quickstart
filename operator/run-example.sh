@@ -8,6 +8,11 @@ SPEC_FILE="${MCQS_ROOT_DIR}/examples/sample-simulation.json"
 PARALLELISM=4
 ARCHITECTURE="${MCQS_NODE_ARCHITECTURE:-amd64}"
 MAX_PARALLELISM="${MCQS_MAX_PARALLELISM:-32}"
+WAIT_FOR_COMPLETION=true
+QUEUE_NAME=""
+GRID_ID=""
+SCENARIO_ID=""
+VALUES_FILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -23,8 +28,28 @@ while [[ $# -gt 0 ]]; do
       ARCHITECTURE="${2:-}"
       shift 2
       ;;
+    --queue-name)
+      QUEUE_NAME="${2:-}"
+      shift 2
+      ;;
+    --grid-id)
+      GRID_ID="${2:-}"
+      shift 2
+      ;;
+    --scenario-id)
+      SCENARIO_ID="${2:-}"
+      shift 2
+      ;;
+    --values)
+      VALUES_FILE="${2:-}"
+      shift 2
+      ;;
+    --no-wait)
+      WAIT_FOR_COMPLETION=false
+      shift
+      ;;
     --help|-h)
-      printf 'Usage: %s [--spec file] [--parallelism count] [--architecture amd64|arm64]\n' "$0"
+      printf 'Usage: %s [--spec file] [--parallelism count] [--architecture amd64|arm64] [--queue-name name] [--grid-id id --scenario-id id] [--values file] [--no-wait]\n' "$0"
       exit 0
       ;;
     *)
@@ -36,6 +61,12 @@ done
 [[ -f "$SPEC_FILE" ]] || mcqs_fail "Simulation spec not found: $SPEC_FILE"
 [[ "$PARALLELISM" =~ ^[1-9][0-9]*$ ]] || mcqs_fail "parallelism must be a positive integer."
 [[ "$ARCHITECTURE" == "amd64" || "$ARCHITECTURE" == "arm64" ]] || mcqs_fail "architecture must be amd64 or arm64."
+[[ -z "$QUEUE_NAME" || "$QUEUE_NAME" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || mcqs_fail "queue-name must be a valid Kubernetes label value."
+[[ -z "$GRID_ID" || "$GRID_ID" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || mcqs_fail "grid-id must contain lowercase letters, digits, and hyphens."
+[[ -z "$SCENARIO_ID" || "$SCENARIO_ID" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] || mcqs_fail "scenario-id must contain lowercase letters, digits, and hyphens."
+[[ -z "$GRID_ID" || -n "$SCENARIO_ID" ]] || mcqs_fail "scenario-id is required when grid-id is set."
+[[ -z "$SCENARIO_ID" || -n "$GRID_ID" ]] || mcqs_fail "grid-id is required when scenario-id is set."
+[[ -z "$VALUES_FILE" || -f "$VALUES_FILE" ]] || mcqs_fail "Helm values file not found: $VALUES_FILE"
 if [[ -n "${MCQS_NODE_ARCHITECTURE:-}" && "$ARCHITECTURE" != "$MCQS_NODE_ARCHITECTURE" ]]; then
   mcqs_fail "architecture ${ARCHITECTURE} does not match this quickstart node pool (${MCQS_NODE_ARCHITECTURE}). Re-provision or use a matching architecture."
 fi
@@ -70,11 +101,17 @@ MCQS_SPEC_COPY="$(mktemp)"
 trap 'rm -f "$MCQS_SPEC_COPY"' EXIT
 jq --arg run_id "$MCQS_RUN_ID" '.run_id = $run_id' "$SPEC_FILE" > "$MCQS_SPEC_COPY"
 
+HELM_VALUES_ARGS=()
+if [[ -n "$VALUES_FILE" ]]; then
+  HELM_VALUES_ARGS=(-f "$VALUES_FILE")
+fi
+
 kubectl -n "$MCQS_NAMESPACE" get serviceaccount "$MCQS_SERVICE_ACCOUNT" >/dev/null || mcqs_fail "Runtime baseline is missing. Run operator/install-runtime.sh first."
 
 mcqs_note "Submitting Indexed Job ${MCQS_RUN_ID}"
 helm upgrade --install "$MCQS_RELEASE" "$MCQS_HELM_DIR" \
   --namespace "$MCQS_NAMESPACE" \
+  "${HELM_VALUES_ARGS[@]}" \
   --set namespace.create=false \
   --set namespace.name="$MCQS_NAMESPACE" \
   --set serviceAccount.create=false \
@@ -89,10 +126,18 @@ helm upgrade --install "$MCQS_RELEASE" "$MCQS_HELM_DIR" \
   --set run.enabled=true \
   --set run.id="$MCQS_RUN_ID" \
   --set run.parallelism="$PARALLELISM" \
+  --set run.queueName="$QUEUE_NAME" \
+  --set run.gridId="$GRID_ID" \
+  --set run.scenarioId="$SCENARIO_ID" \
   --set-file run.specJson="$MCQS_SPEC_COPY"
 
 MCQS_JOB="$(kubectl -n "$MCQS_NAMESPACE" get jobs -l "monte-carlo.oracle.com/run-id=${MCQS_RUN_ID}" -o jsonpath='{.items[0].metadata.name}')"
 [[ -n "$MCQS_JOB" ]] || mcqs_fail "Helm reported success but no simulation Job was found."
+
+if [[ "$WAIT_FOR_COMPLETION" != true ]]; then
+  printf 'Submitted run %s as Job %s.\n' "$MCQS_RUN_ID" "$MCQS_JOB"
+  exit 0
+fi
 
 if ! kubectl -n "$MCQS_NAMESPACE" wait --for=condition=complete "job/${MCQS_JOB}" --timeout="${MCQS_WAIT_TIMEOUT:-20m}"; then
   kubectl -n "$MCQS_NAMESPACE" describe "job/${MCQS_JOB}" || true
