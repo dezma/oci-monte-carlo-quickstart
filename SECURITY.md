@@ -19,13 +19,9 @@ This project is an accelerator, not a replacement for a customer's landing-zone 
 - Structured logs omit input data and credentials.
 - Synthetic sample data only.
 
-## Controls the customer must own
+## Controls the OCI Admin must own
 
 - IAM policies for the human deployer and OCI Bastion session users, network route review, and OCI tenancy logging policy. Any user allowed to operate the VM can act through its instance principal, so restrict Bastion access, sudo, and Docker-group membership.
 - Image vulnerability scanning, image-signing policy, and registry retention policy in the target tenancy.
 - Security Zones, Cloud Guard, data classification, key-management, retention, backup, and incident-response policy.
 - A formal review before using portfolio, customer, market, or regulated data, including an agreed OCIR pull-secret rotation process.
-
-## Reporting a vulnerability
-
-Do not file sensitive vulnerability details in a public issue. Follow your organization's security-reporting procedure, include the project version and a minimal reproduction, and rotate any exposed credentials immediately.
