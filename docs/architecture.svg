@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1150" viewBox="0 0 1800 1150" role="img" aria-labelledby="title desc">
+  <title id="title">OCI Monte Carlo Quickstart architecture</title>
+  <desc id="desc">Private OKE Monte Carlo workload with Cloud Shell provisioning, Bastion-reached operator, private Kubernetes API, managed worker nodes, Object Storage results, OCIR, IAM, logging, and security boundaries.</desc>
+  <defs>
+    <style>
+      .canvas { fill: #f8fafc; }
+      .region { fill: #ffffff; stroke: #075b86; stroke-width: 2; }
+      .vcn { fill: #fffdfb; stroke: #f97316; stroke-width: 2.5; stroke-dasharray: 8 7; }
+      .subnet-blue { fill: #f5faff; stroke: #0877d1; stroke-width: 2.5; stroke-dasharray: 7 6; }
+      .subnet-green { fill: #f6fff9; stroke: #149447; stroke-width: 2.5; stroke-dasharray: 7 6; }
+      .subnet-purple { fill: #fcf8ff; stroke: #7c3aed; stroke-width: 2.5; stroke-dasharray: 7 6; }
+      .subnet-orange { fill: #fffaf5; stroke: #f97316; stroke-width: 2.5; stroke-dasharray: 7 6; }
+      .fd { fill: #f7f9fb; stroke: #cad2dc; stroke-width: 1.5; }
+      .card { fill: #ffffff; stroke: #0b5b85; stroke-width: 2; }
+      .card-muted { fill: #ffffff; stroke: #6d7a86; stroke-width: 1.6; }
+      .service { fill: #ffffff; stroke: #0b5b85; stroke-width: 2; }
+      .tag-blue { fill: #e6f3ff; stroke: #0877d1; stroke-width: 1.2; }
+      .tag-green { fill: #e9f9ee; stroke: #149447; stroke-width: 1.2; }
+      .tag-purple { fill: #f2eaff; stroke: #7c3aed; stroke-width: 1.2; }
+      .tag-orange { fill: #fff0e6; stroke: #f97316; stroke-width: 1.2; }
+      .t-title { font: 700 24px Arial, Helvetica, sans-serif; fill: #102a43; }
+      .t-region { font: 700 21px Arial, Helvetica, sans-serif; fill: #102a43; }
+      .t-h { font: 700 18px Arial, Helvetica, sans-serif; fill: #102a43; }
+      .t-sub { font: 700 16px Arial, Helvetica, sans-serif; fill: #075b86; }
+      .t-green { font: 700 16px Arial, Helvetica, sans-serif; fill: #087b3b; }
+      .t-purple { font: 700 16px Arial, Helvetica, sans-serif; fill: #6d28d9; }
+      .t-orange { font: 700 16px Arial, Helvetica, sans-serif; fill: #d95b08; }
+      .t-body { font: 15px Arial, Helvetica, sans-serif; fill: #243b53; }
+      .t-small { font: 13px Arial, Helvetica, sans-serif; fill: #486581; }
+      .t-tiny { font: 12px Arial, Helvetica, sans-serif; fill: #486581; }
+      .t-center { text-anchor: middle; }
+      .line { fill: none; stroke: #263d4d; stroke-width: 2; marker-end: url(#arrow); }
+      .line-blue { fill: none; stroke: #0877d1; stroke-width: 2.2; marker-end: url(#arrow-blue); }
+      .line-green { fill: none; stroke: #149447; stroke-width: 2.2; marker-end: url(#arrow-green); }
+      .line-purple { fill: none; stroke: #7c3aed; stroke-width: 2.2; marker-end: url(#arrow-purple); }
+      .line-orange { fill: none; stroke: #f97316; stroke-width: 2.2; marker-end: url(#arrow-orange); }
+      .line-dashed { stroke-dasharray: 6 5; }
+      .badge { fill: #0b5b85; }
+      .shield { fill: #e7f3f9; stroke: #0b5b85; stroke-width: 1.5; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#263d4d"/></marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#0877d1"/></marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#149447"/></marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#7c3aed"/></marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f97316"/></marker>
+  </defs>
+
+  <rect class="canvas" width="1800" height="1150"/>
+  <rect class="region" x="12" y="12" width="1776" height="1126" rx="22"/>
+  <text class="t-region" x="34" y="43">OCI Region</text>
+  <text class="t-body" x="34" y="68">&lt;selected-region&gt;</text>
+  <text class="t-title t-center" x="900" y="47">OCI Monte Carlo Quickstart — private OKE execution architecture</text>
+
+  <!-- Provisioning and human access outside the VCN -->
+  <rect class="card-muted" x="38" y="155" width="128" height="112" rx="12"/>
+  <circle class="badge" cx="73" cy="192" r="18"/>
+  <path d="M63 192h20M73 182v20" stroke="#fff" stroke-width="3"/>
+  <text class="t-h t-center" x="104" y="226">Cloud Shell</text>
+  <text class="t-small t-center" x="104" y="246">or workstation</text>
+
+  <rect class="card-muted" x="38" y="300" width="128" height="112" rx="12"/>
+  <rect x="58" y="324" width="34" height="34" rx="4" fill="#e7f3f9" stroke="#0b5b85" stroke-width="2"/>
+  <path d="M64 346h22M75 335v22" stroke="#0b5b85" stroke-width="2"/>
+  <text class="t-h t-center" x="104" y="375">Resource</text>
+  <text class="t-h t-center" x="104" y="396">Manager</text>
+
+  <rect class="card-muted" x="38" y="830" width="128" height="112" rx="12"/>
+  <circle cx="74" cy="866" r="17" fill="#e7f3f9" stroke="#0b5b85" stroke-width="2"/>
+  <path d="M74 854v24M62 865h24" stroke="#0b5b85" stroke-width="2"/>
+  <text class="t-h t-center" x="104" y="906">Administrator</text>
+  <text class="t-small t-center" x="104" y="926">allowed CIDR</text>
+
+  <!-- VCN and availability domain -->
+  <rect class="vcn" x="192" y="91" width="1225" height="952" rx="18"/>
+  <text class="t-orange" x="215" y="122">VCN</text>
+  <text class="t-body" x="215" y="144">10.42.0.0/16 · private runtime boundary</text>
+
+  <rect class="fd" x="430" y="70" width="275" height="944" rx="12" opacity="0.68"/>
+  <rect class="fd" x="725" y="70" width="275" height="944" rx="12" opacity="0.68"/>
+  <rect class="fd" x="1020" y="70" width="275" height="944" rx="12" opacity="0.68"/>
+  <text class="t-h t-center" x="862" y="92">Availability Domain</text>
+  <text class="t-small t-center" x="567" y="119">Fault Domain 1</text>
+  <text class="t-small t-center" x="862" y="119">Fault Domain 2</text>
+  <text class="t-small t-center" x="1157" y="119">Fault Domain 3</text>
+
+  <!-- API subnet -->
+  <rect class="subnet-blue" x="237" y="165" width="1068" height="124" rx="14"/>
+  <text class="t-sub" x="260" y="195">API subnet · 10.42.0.0/28 · private</text>
+  <rect class="card" x="470" y="188" width="610" height="77" rx="10"/>
+  <circle cx="514" cy="226" r="23" fill="#e7f3f9" stroke="#0b5b85" stroke-width="2"/>
+  <path d="M500 221l14-11 14 11v17l-14 11-14-11zM514 210v39M500 221h28" fill="none" stroke="#0b5b85" stroke-width="2"/>
+  <text class="t-h" x="553" y="218">Oracle Kubernetes Engine (OKE)</text>
+  <text class="t-body" x="553" y="241">Enhanced cluster · private Kubernetes API endpoint :6443</text>
+  <rect class="shield" x="1173" y="191" width="106" height="68" rx="9"/>
+  <text class="t-h t-center" x="1226" y="218">NSG</text>
+  <text class="t-tiny t-center" x="1226" y="239">API + operator</text>
+
+  <!-- Worker and pod subnets -->
+  <rect class="subnet-green" x="237" y="322" width="1068" height="348" rx="14"/>
+  <text class="t-green" x="260" y="351">Worker subnet · 10.42.1.0/24 · managed private nodes</text>
+  <rect class="card-muted" x="401" y="380" width="370" height="183" rx="12"/>
+  <rect x="429" y="405" width="57" height="45" rx="5" fill="#e9f9ee" stroke="#087b3b" stroke-width="2"/>
+  <path d="M440 417h35M440 428h35M440 439h35" stroke="#087b3b" stroke-width="3"/>
+  <text class="t-h" x="510" y="415">Managed OKE node pool</text>
+  <text class="t-body" x="510" y="439">Selected OCI Compute shape</text>
+  <text class="t-small" x="510" y="461">Intel / AMD / Ampere profile</text>
+  <text class="t-small" x="510" y="483">private VNIC · no public IP</text>
+  <rect class="tag-green" x="510" y="500" width="196" height="27" rx="13"/>
+  <text class="t-tiny t-center" x="608" y="518">workload.oracle.com/monte-carlo=true</text>
+
+  <rect class="subnet-green" x="799" y="378" width="466" height="247" rx="12"/>
+  <text class="t-green" x="822" y="405">Pod subnet · 10.42.16.0/20</text>
+  <text class="t-small" x="822" y="426">VCN-native pod networking</text>
+  <rect class="card" x="830" y="448" width="168" height="118" rx="9"/>
+  <rect class="card" x="1025" y="448" width="168" height="118" rx="9"/>
+  <text class="t-h t-center" x="914" y="479">Indexed Job</text>
+  <text class="t-body t-center" x="914" y="502">partition 0</text>
+  <text class="t-small t-center" x="914" y="526">immutable input</text>
+  <text class="t-h t-center" x="1109" y="479">Indexed Job</text>
+  <text class="t-body t-center" x="1109" y="502">partition N</text>
+  <text class="t-small t-center" x="1109" y="526">digest image</text>
+  <rect class="tag-green" x="858" y="580" width="376" height="26" rx="13"/>
+  <text class="t-tiny t-center" x="1046" y="598">Workload Identity · ServiceAccount monte-carlo-runner</text>
+  <rect class="shield" x="1175" y="333" width="93" height="35" rx="8"/>
+  <text class="t-tiny t-center" x="1221" y="355">NSG (OKE)</text>
+
+  <!-- Operator subnet -->
+  <rect class="subnet-purple" x="237" y="702" width="1068" height="124" rx="14"/>
+  <text class="t-purple" x="260" y="731">Operator subnet · 10.42.48.0/28 · private</text>
+  <rect class="card" x="550" y="725" width="475" height="77" rx="10"/>
+  <rect x="577" y="743" width="43" height="40" rx="4" fill="#f2eaff" stroke="#6d28d9" stroke-width="2"/>
+  <path d="M587 754h23M587 764h23M587 774h23" stroke="#6d28d9" stroke-width="2.5"/>
+  <text class="t-h" x="647" y="752">Private operator VM</text>
+  <text class="t-body" x="647" y="775">OCI CLI · kubectl · Helm · Docker · result reducer</text>
+  <rect class="tag-purple" x="1047" y="738" width="206" height="28" rx="14"/>
+  <text class="t-tiny t-center" x="1150" y="757">Instance principal · no API keys</text>
+  <rect class="shield" x="1175" y="778" width="93" height="35" rx="8"/>
+  <text class="t-tiny t-center" x="1221" y="800">NSG (operator)</text>
+
+  <!-- Bastion service subnet -->
+  <rect class="subnet-orange" x="237" y="858" width="1068" height="124" rx="14"/>
+  <text class="t-orange" x="260" y="887">Bastion subnet · 10.42.49.0/28 · private service endpoint</text>
+  <rect class="card" x="552" y="882" width="472" height="75" rx="10"/>
+  <circle cx="590" cy="920" r="23" fill="#fff0e6" stroke="#d95b08" stroke-width="2"/>
+  <path d="M579 920h22M590 909v22M582 912l16 16M598 912l-16 16" stroke="#d95b08" stroke-width="2"/>
+  <text class="t-h" x="627" y="916">OCI Bastion service</text>
+  <text class="t-body" x="627" y="940">Managed SSH to operator · time-limited RBAC tunnel only</text>
+  <rect class="shield" x="1175" y="903" width="93" height="35" rx="8"/>
+  <text class="t-tiny t-center" x="1221" y="925">NSG (Bastion)</text>
+
+  <!-- OCI services column -->
+  <text class="t-h t-center" x="1585" y="135">OCI services</text>
+  <rect class="service" x="1442" y="161" width="290" height="122" rx="12"/>
+  <rect x="1465" y="184" width="54" height="52" rx="6" fill="#e7f3f9" stroke="#0b5b85" stroke-width="2"/>
+  <path d="M1477 198h30M1477 210h30M1477 222h30" stroke="#0b5b85" stroke-width="3"/>
+  <text class="t-h" x="1540" y="199">Object Storage</text>
+  <text class="t-body" x="1540" y="222">operator bundle</text>
+  <text class="t-small" x="1540" y="245">immutable partial results</text>
+
+  <rect class="service" x="1442" y="325" width="290" height="112" rx="12"/>
+  <rect x="1465" y="348" width="54" height="46" rx="6" fill="#e7f3f9" stroke="#0b5b85" stroke-width="2"/>
+  <path d="M1475 385l14-22 14 22M1496 385l12-18" fill="none" stroke="#0b5b85" stroke-width="2.5"/>
+  <text class="t-h" x="1540" y="365">OCI Container Registry</text>
+  <text class="t-small" x="1540" y="389">private digest-addressed image</text>
+
+  <rect class="service" x="1442" y="479" width="290" height="112" rx="12"/>
+  <rect x="1465" y="502" width="54" height="46" rx="6" fill="#e7f3f9" stroke="#0b5b85" stroke-width="2"/>
+  <path d="M1475 538v-21h9v21h10v-31h9v31" fill="none" stroke="#0b5b85" stroke-width="2.5"/>
+  <text class="t-h" x="1540" y="519">Logging and Monitoring</text>
+  <text class="t-small" x="1540" y="543">OKE, Job, and audit signals</text>
+
+  <rect class="service" x="1442" y="633" width="290" height="112" rx="12"/>
+  <rect x="1465" y="656" width="54" height="46" rx="6" fill="#e7f3f9" stroke="#0b5b85" stroke-width="2"/>
+  <path d="M1492 664c-8 0-14 6-14 14 0 10 14 19 14 19s14-9 14-19c0-8-6-14-14-14z" fill="none" stroke="#0b5b85" stroke-width="2.2"/>
+  <text class="t-h" x="1540" y="674">OCI IAM</text>
+  <text class="t-small" x="1540" y="697">dynamic group, policies, identities</text>
+
+  <rect class="tag-blue" x="1442" y="785" width="290" height="53" rx="12"/>
+  <text class="t-h t-center" x="1587" y="809">Service Gateway</text>
+  <text class="t-tiny t-center" x="1587" y="828">private access to Oracle Services Network</text>
+  <rect class="tag-orange" x="1442" y="858" width="290" height="53" rx="12"/>
+  <text class="t-h t-center" x="1587" y="882">NAT Gateway</text>
+  <text class="t-tiny t-center" x="1587" y="901">outbound package and image access only</text>
+
+  <!-- Flows -->
+  <path class="line-orange line-dashed" d="M166 355 H192 V155 H235"/>
+  <text class="t-tiny" x="29" y="440">Provision only</text>
+  <text class="t-tiny" x="29" y="455">no private OKE access</text>
+
+  <path class="line" d="M166 886 H237"/>
+  <text class="t-tiny" x="36" y="810">Managed SSH</text>
+  <text class="t-tiny" x="36" y="825">from approved CIDR</text>
+  <path class="line-purple" d="M788 882 V826"/>
+  <text class="t-tiny" x="803" y="855">Bastion session</text>
+
+  <path class="line-blue" d="M787 725 V287"/>
+  <text class="t-tiny" x="804" y="512">private API :6443</text>
+  <path class="line-blue" d="M790 265 V448 H830"/>
+  <text class="t-tiny" x="808" y="337">control plane schedules Jobs</text>
+
+  <path class="line-green" d="M1193 508 H1385 V222 H1442"/>
+  <text class="t-tiny" x="1276" y="493">write-once partials</text>
+  <text class="t-tiny" x="1276" y="508">Workload Identity</text>
+  <path class="line-green line-dashed" d="M1193 472 H1350 V381 H1442"/>
+  <text class="t-tiny" x="1266" y="399">pull private image</text>
+
+  <path class="line-purple" d="M1025 762 H1363 V222 H1442"/>
+  <text class="t-tiny" x="1150" y="745">bootstrap + aggregate</text>
+  <path class="line-purple line-dashed" d="M1025 782 H1378 V381 H1442"/>
+  <text class="t-tiny" x="1200" y="771">build and publish</text>
+
+  <path class="line-dashed" d="M1305 484 H1408 V535 H1442"/>
+  <text class="t-tiny" x="1325" y="565">logs and events</text>
+  <path class="line-dashed" d="M1305 765 H1400 V689 H1442"/>
+  <text class="t-tiny" x="1330" y="713">policy evaluation</text>
+
+  <!-- Legend -->
+  <rect class="card-muted" x="227" y="1061" width="1195" height="62" rx="12"/>
+  <line x1="252" y1="1084" x2="306" y2="1084" stroke="#0877d1" stroke-width="3" stroke-dasharray="7 6"/>
+  <text class="t-small" x="316" y="1089">private OKE API</text>
+  <line x1="475" y1="1084" x2="529" y2="1084" stroke="#149447" stroke-width="3" stroke-dasharray="7 6"/>
+  <text class="t-small" x="539" y="1089">worker and pod network</text>
+  <line x1="770" y1="1084" x2="824" y2="1084" stroke="#7c3aed" stroke-width="3" stroke-dasharray="7 6"/>
+  <text class="t-small" x="834" y="1089">private operator network</text>
+  <line x1="1089" y1="1084" x2="1143" y2="1084" stroke="#f97316" stroke-width="3" stroke-dasharray="7 6"/>
+  <text class="t-small" x="1153" y="1089">Bastion and VCN boundaries</text>
+  <text class="t-tiny" x="252" y="1110">No public IP addresses on operator, OKE API, worker nodes, or pods. Cloud Shell and Resource Manager are provisioning-plane only.</text>
+</svg>

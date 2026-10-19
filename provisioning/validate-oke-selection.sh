@@ -7,7 +7,7 @@ source "$(cd -- "$(dirname -- "$0")/.." && pwd -P)/scripts/lib.sh"
 COMPARTMENT_ID=""
 NODE_SHAPE=""
 ARCHITECTURE=""
-KUBERNETES_VERSION="v1.36.1"
+KUBERNETES_VERSION=""
 NODE_IMAGE_ID=""
 
 while [[ $# -gt 0 ]]; do
@@ -33,7 +33,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help|-h)
-      printf 'Usage: %s --compartment-id <ocid> --node-shape <shape> --architecture amd64|arm64 --node-image-id <image-ocid> [--kubernetes-version v1.36.1]\n\nValidates the selected full OKE patch version and Oracle Linux 8 node image against live OCI control-plane options before Resource Manager provisioning.\n' "$0"
+      printf 'Usage: %s --compartment-id <ocid> --node-shape <shape> --architecture amd64|arm64 --kubernetes-version <full-version> --node-image-id <image-ocid>\n\nValidates the selected full OKE patch version and Oracle Linux 8 node image against live OCI control-plane options before Resource Manager provisioning.\n' "$0"
       exit 0
       ;;
     *)

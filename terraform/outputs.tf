@@ -53,6 +53,11 @@ output "operator_session_create_command" {
   description = "Run from a workstation with OCI CLI and an SSH key. Then copy the SSH command from the Bastion session details."
 }
 
+output "operator_rbac_bastion_session_create_command" {
+  value       = "oci bastion session create-port-forwarding --bastion-id ${oci_bastion_bastion.operator.id} --target-private-ip ${oci_containerengine_cluster.this.endpoints[0].private_endpoint} --target-port 6443 --ssh-public-key-file $HOME/.ssh/id_ed25519.pub --session-ttl 3600 --wait-for-state SUCCEEDED"
+  description = "Run only to apply operator_namespace_rbac_manifest as a tenancy administrator or Kubernetes cluster-admin. Then use the tunnel command displayed in the Bastion session details."
+}
+
 output "node_pool_id" {
   value       = oci_containerengine_node_pool.workers.id
   description = "Managed worker node pool OCID."
@@ -71,6 +76,24 @@ output "node_architecture" {
 output "operator_shape" {
   value       = local.operator_shape
   description = "Private operator VM shape selected for the configured worker architecture."
+}
+
+output "operator_kubernetes_access_mode" {
+  value       = local.operator_kubernetes_access_mode
+  description = "Kubernetes API authorization model selected for the operator instance."
+}
+
+output "operator_dynamic_group_id" {
+  value       = oci_identity_dynamic_group.operator.id
+  description = "Dynamic group OCID for the private operator instance principal."
+}
+
+output "operator_namespace_rbac_manifest" {
+  value = templatefile("${path.module}/operator/namespace-rbac.yaml.tftpl", {
+    kubernetes_namespace        = var.kubernetes_namespace
+    operator_dynamic_group_ocid = oci_identity_dynamic_group.operator.id
+  })
+  description = "Apply once as a cluster administrator through an OCI Bastion port-forwarding session when operator_kubernetes_access_mode is namespace_rbac."
 }
 
 output "object_storage_bucket" {

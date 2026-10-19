@@ -24,11 +24,15 @@ Cloud Shell is optional. Resource Manager creates infrastructure only; it does n
 - Indexed Kubernetes Jobs that write immutable partial results with OKE Workload Identity.
 - A local operator-side reducer that validates the partial results and calculates the final estimate.
 
-## The Monte Carlo example
+(docs/architecture.svg)
+
+
+
+## The Monte Carlo example, in plain language
 
 The supplied example prices a one-year **European call option**. It asks: *what is the value today of the right to buy an asset for 100 in one year, when the asset is currently 102?*
 
-For each simulated market path, the engine evolves the price with geometric Brownian motion, calculates the payoff at expiry, and discounts it to today
+For each simulated market path, the engine evolves the price with geometric Brownian motion, calculates the payoff at expiry, and discounts it to today:
 
 It averages many discounted payoffs to estimate the option value. The sample uses 200,000 paths, 32 time steps, a fixed seed, and antithetic paths (each random shock is paired with its inverse) to reduce statistical noise without changing the financial model.
 
@@ -193,6 +197,7 @@ Copy the relevant values into the Resource Manager form or a local `terraform.tf
 | Run additional derivative products and a market-risk sensitivity grid | [Financial examples](docs/financial-examples.md) |
 | Demonstrate Kueue scheduling, autoscaled capacity, and worker recovery | [Grid, elastic capacity, and resilience](docs/grid-elastic-resilience.md) |
 | Select a current CPU, HPC, or Acceleron shape | [Shape catalogue](docs/shape-catalog.md) and `provisioning/list-shapes.sh` |
+| Explain the user journey and onboarding choices | [Human-centered design](docs/human-centered-design.md) |
 | Review security assumptions and residual risks | [Threat model](docs/threat-model.md) and [SECURITY.md](SECURITY.md) |
 | Use local Terraform instead of Resource Manager | [Terraform guide](terraform/README.md) |
 | Package the whole project for sharing | `./provisioning/package.sh` |

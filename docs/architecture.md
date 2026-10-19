@@ -2,6 +2,10 @@
 
 The quickstart has two intentionally different planes. A local provisioning workstation (with OCI Cloud Shell as an optional convenience) discovers current OCI choices and drives Resource Manager. A Bastion-reached private operator VM executes the runtime against the private cluster.
 
+![OCI Monte Carlo Quickstart architecture](architecture.svg)
+
+The diagram uses the quickstart's default private CIDR layout. It is an implementation view, not a capacity topology: the selected worker shape, worker count, and Availability Domain are supplied during provisioning.
+
 ```mermaid
 flowchart TD
   P["Provisioning plane\n(local CLI or optional Cloud Shell)"] --> RM["Resource Manager"]
@@ -19,11 +23,11 @@ Resource Manager creates the infrastructure only: private enhanced OKE, private 
 
 ## Live OKE compatibility boundary
 
-The provisioning plane must query OCI immediately before an Apply. Shape availability, OKE supported versions, node images, and capacity are live provider facts rather than a static catalogue. `v1.36.1` is the prefilled recommended full version; that exact patch must still appear in the live OKE version result before it is used. The selected node image must be returned for the exact OKE version and the selected node architecture (`amd64` for Intel/AMD or `arm64` for Ampere). Neither the node image nor its architecture is an optional default.
+The provisioning plane must query OCI immediately before an Apply. Shape availability, OKE supported versions, node images, and capacity are live provider facts rather than a static catalogue. Select a full Kubernetes patch version from the live OKE response and pair it with an image from that same response. The selected node image must match the exact OKE version and selected node architecture (`amd64` for Intel/AMD or `arm64` for Ampere). Neither the Kubernetes version nor node image is an optional default.
 
 ## Trust boundaries
 
-- A human uses OCI IAM and a time-limited Bastion Managed SSH session to reach the private operator VM. The operator uses an instance principal, not stored OCI API keys, to generate a kubeconfig for the private OKE endpoint.
+- A human uses OCI IAM and a time-limited Bastion Managed SSH session to reach the private operator VM. The operator uses an instance principal, not stored OCI API keys, to generate a kubeconfig for the private OKE endpoint. The stack makes Kubernetes authorization explicit: the quickstart `iam_admin` mode scopes OKE `manage clusters` to this one cluster; the `namespace_rbac` mode retains `use clusters` and requires a one-time namespace-scoped RoleBinding applied by a cluster administrator.
 - The provisioning plane has no runtime role. Cloud Shell, when used, is not a private-cluster runtime or an alternate route to the OKE API.
 - Pods use only the workload identity defined by the cluster, namespace, and ServiceAccount. They do not receive user API keys or an operator credential.
 - OCIR image pulls use a namespace-scoped pull secret. That credential is distinct from the operator's instance principal and must be rotated outside Terraform and source control.

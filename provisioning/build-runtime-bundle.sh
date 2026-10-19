@@ -42,9 +42,9 @@ tar -C "$MCQS_PARENT_DIR" -czf "$MCQS_OPERATOR_BUNDLE" \
   "${MCQS_BASENAME}/requirements.txt" \
   "${MCQS_BASENAME}/pyproject.toml" \
   "${MCQS_BASENAME}/README.md" \
+  "${MCQS_BASENAME}/SECURITY.md" \
   "${MCQS_BASENAME}/LICENSE" \
-  "${MCQS_BASENAME}/docs/architecture.md" \
-  "${MCQS_BASENAME}/docs/threat-model.md" \
-  "${MCQS_BASENAME}/docs/provisioning-and-operator.md"
+  "${MCQS_BASENAME}/docs" \
+  "${MCQS_BASENAME}/profiles"
 
 printf 'Created %s\n' "$MCQS_OPERATOR_BUNDLE"

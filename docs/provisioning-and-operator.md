@@ -20,7 +20,7 @@ Select a shape that is both available and supported by OKE, then ask OCI for a n
 
 ```bash
 export NODE_SHAPE="VM.Standard.E6.Flex"
-export KUBERNETES_VERSION="v1.36.1"
+export KUBERNETES_VERSION="<full-version-returned-by-OCI>"
 export NODE_ARCHITECTURE="amd64"
 
 ./provisioning/list-oke-options.sh \
@@ -33,7 +33,7 @@ export NODE_ARCHITECTURE="amd64"
 export NODE_IMAGE_ID="ocid1.image.oc1..replace-with-live-result"
 ```
 
-`v1.36.1` is the prefilled recommended version, not a promise of availability. Keep it only when the live OKE version query reports that exact patch for the target tenancy and region. OKE requires a full patch version; `v1.36` is invalid. The operator bootstrap installs the matching kubectl patch release and verifies its checksum.
+The Kubernetes version is a required live selection, not a static project default. OKE requires a full patch version; `v1.36` is invalid. The operator bootstrap installs the matching kubectl patch release and verifies its checksum.
 
 The node image and architecture are mandatory compatibility decisions. Set Resource Manager's `node_architecture` explicitly (`amd64` for Intel/AMD or `arm64` for Ampere), then use only an image OCID returned for that exact Kubernetes version and architecture. Never reuse a node-image OCID from a different version, shape family, or architecture. Flexible shapes also need OCPUs and memory; fixed shapes require those two Resource Manager values to be `null`.
 
@@ -58,7 +58,12 @@ Build the Resource Manager archive from the provisioning plane:
 ./provisioning/build-orm.sh
 ```
 
-Upload `dist/orm.zip` to OCI Resource Manager. Enter the live-verified Kubernetes version, `node_architecture`, node image OCID, and node configuration, plus a narrow `bastion_client_cidr` for the workstation or corporate VPN that will create the Managed SSH session. Review Resource Manager's plan and then apply it.
+Upload `dist/orm.zip` to OCI Resource Manager. Enter the live-verified Kubernetes version, `node_architecture`, node image OCID, and node configuration, plus a narrow `bastion_client_cidr` for the workstation or corporate VPN that will create the Managed SSH session. Select the explicit `operator_kubernetes_access_mode` as well:
+
+- `iam_admin` is the recommended quickstart path. The private operator receives OKE `manage clusters` only for the cluster created by this stack. That includes OKE's `AdministerK8s` operation, which Helm and kubectl require. It is not tenancy-wide, but it can administer Kubernetes objects and update this cluster.
+- `namespace_rbac` is the stricter steady-state path. The operator receives only OKE `use clusters`, which is enough to create its kubeconfig but not enough to deploy Kubernetes objects. A tenancy administrator or Kubernetes cluster-admin applies the generated `operator_namespace_rbac_manifest` output once; it grants only the Monte Carlo namespace resources used by this project.
+
+Keep `operator_bootstrap_generation = 1` for a new stack. Increment it only when you intentionally want Resource Manager to replace the operator VM and apply an updated runtime bundle. Review Resource Manager's plan and then apply it.
 
 The stack's boundary ends here. Treat a successful Apply as an infrastructure handoff, not as evidence that a simulation runtime or image-pull secret exists.
 
@@ -74,7 +79,29 @@ cd /home/opc/oci-monte-carlo-quickstart
 ./operator/doctor.sh
 ```
 
-The profile supplies the private-cluster, registry, Object Storage, architecture, and Python settings for the runtime. The bootstrap installs the operator tooling, uses the VM instance principal to obtain private OKE access, and writes its ready marker only after it can reach the cluster. `operator/doctor.sh` is the first runtime check: it verifies the bootstrap, instance-principal access, local tooling, and private OKE connectivity. If it reports an incomplete bootstrap, review `/var/log/mcqs-operator-bootstrap.log` rather than trying to run runtime commands from the provisioning plane.
+The profile supplies the private-cluster, registry, Object Storage, architecture, access-mode, and Python settings for the runtime. The bootstrap installs the operator tooling and generates the private OKE kubeconfig. `operator/doctor.sh` verifies the bootstrap, instance-principal access, local tooling, and Kubernetes authorization without trying to list `kube-system` services. If it reports an incomplete bootstrap, review `/var/log/mcqs-operator-bootstrap.log` rather than trying to run runtime commands from the provisioning plane.
+
+### One-time RBAC bootstrap for `namespace_rbac`
+
+This step is unnecessary for the `iam_admin` quickstart path. For `namespace_rbac`, copy the `operator_namespace_rbac_manifest` stack output to `operator-namespace-rbac.yaml`. A principal in the tenancy `Administrators` group or with an existing Kubernetes `cluster-admin` binding must apply it; compartment administrator permissions alone do not create Kubernetes RBAC roles.
+
+Use the `operator_rbac_bastion_session_create_command` stack output to create a time-limited port-forwarding session to the private OKE endpoint. Start the SSH tunnel command shown in that Bastion session's details, listening on a local port such as `6443`. From that administrator's terminal, create a personal kubeconfig and point its selected cluster at the tunnel:
+
+```bash
+oci ce cluster create-kubeconfig \
+  --cluster-id "$CLUSTER_ID" \
+  --file "$HOME/.kube/mcqs-admin-config" \
+  --region "$REGION" \
+  --token-version 2.0.0 \
+  --kube-endpoint PRIVATE_ENDPOINT
+
+export KUBECONFIG="$HOME/.kube/mcqs-admin-config"
+kubectl config set-cluster "$(kubectl config view -o jsonpath='{.contexts[0].context.cluster}')" \
+  --server=https://127.0.0.1:6443
+kubectl apply -f operator-namespace-rbac.yaml
+```
+
+The tunnel and the administrator kubeconfig are only for this one-time binding; they are not the runtime path. Disconnect the tunnel when the apply succeeds, then return to the private operator VM and run `./operator/doctor.sh`.
 
 ## 4. Install the shared runtime baseline
 
@@ -138,6 +165,6 @@ Each invocation creates a unique run ID and a run-specific Helm release. The cha
 
 Aggregation accepts only one run ID and input hash and checks that every expected partition occurs exactly once before combining additive moments. The printed price, confidence interval, input hash, and runtime metadata therefore remain tied to one reproducible run rather than a mixture of retries or submissions.
 
-## Cleanup and recovery boundaries
+## Cleanup
 
 `operator/cleanup-runtime.sh` removes the Monte Carlo Helm releases while leaving the namespace and `ocir-pull` secret in place for deliberate review or rotation. Use a Resource Manager Destroy job to remove the infrastructure when the environment is no longer needed. For a local Terraform fallback, the provisioning-plane scripts are `provisioning/terraform-apply.sh` and `provisioning/terraform-destroy.sh`; they are not operator-runtime commands.

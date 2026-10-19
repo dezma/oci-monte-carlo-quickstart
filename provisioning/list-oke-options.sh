@@ -51,11 +51,10 @@ if [[ -z "$KUBERNETES_VERSION" ]]; then
     --output table
   cat <<'MESSAGE'
 
-`v1.36.1` is the quickstart's prefilled recommended full version. Confirm it
-appears in this live response (or select another offered full version), then rerun with
---node-shape, --architecture, and --kubernetes-version to obtain a compatible
-node image OCID. Minor-only values such as `v1.36` are not valid OKE API inputs.
-The node image remains a required Resource Manager input.
+Select one full version from this live response, then rerun with --node-shape,
+--architecture, and --kubernetes-version to obtain a compatible node image OCID.
+Minor-only values such as `v1.36` are not valid OKE API inputs. Kubernetes
+version and node image are required Resource Manager inputs.
 MESSAGE
   exit 0
 fi
