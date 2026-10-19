@@ -4,6 +4,29 @@ Deploy and run a secure, repeatable Monte Carlo option-pricing example on OCI.
 
 The quickstart creates a private OKE environment for the workers and a private operator VM for the person running the workload. It is designed to help a quant, developer, cloud engineer, or security reviewer reach the same clear outcome: a reproducible estimate, a confidence interval, and the evidence needed to understand what produced it.
 
+# Architecture and execution model
+
+The quickstart has two intentionally different planes. A local provisioning workstation (with OCI Cloud Shell as an optional convenience) discovers current OCI choices and drives Resource Manager. A Bastion-reached private operator VM executes the runtime against the private cluster.
+
+![OCI Monte Carlo Quickstart architecture](docs/architecture.svg)
+
+The diagram uses the quickstart's default private CIDR layout. It is an implementation view, not a capacity topology: the selected worker shape, worker count, and Availability Domain are supplied during provisioning.
+
+```mermaid
+flowchart TD
+  P["Provisioning plane\n(local CLI or optional Cloud Shell)"] --> RM["Resource Manager"]
+  RM --> I["Private infrastructure"]
+  I --> B["OCI Bastion"]
+  I --> O["Private operator VM"]
+  B --> O
+  O --> K["Private OKE API"]
+  K --> J["Indexed Monte Carlo Job"]
+  J --> S["Private Object Storage"]
+  O --> R["Private OCIR"]
+```
+
+Resource Manager creates the infrastructure only: private enhanced OKE, private networking, OCI Bastion, the private operator VM, OCIR, Object Storage, and supporting IAM and observability resources. Image publishing, Helm baseline installation, image-pull-secret creation, job submission, status inspection, and result aggregation all run from the operator VM.
+
 ## Start here
 
 There are two places to work. Keeping them separate is intentional.
@@ -23,10 +46,6 @@ Cloud Shell is optional. Resource Manager creates infrastructure only; it does n
 - A Helm runtime baseline with a restricted Pod Security policy, NetworkPolicy, resource limits, and a baseline-owned ServiceAccount.
 - Indexed Kubernetes Jobs that write immutable partial results with OKE Workload Identity.
 - A local operator-side reducer that validates the partial results and calculates the final estimate.
-
-(docs/architecture.svg)
-
-
 
 ## The Monte Carlo example, in plain language
 
