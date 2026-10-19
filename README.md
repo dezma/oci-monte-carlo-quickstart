@@ -47,7 +47,7 @@ Cloud Shell is optional. Resource Manager creates infrastructure only; it does n
 - Indexed Kubernetes Jobs that write immutable partial results with OKE Workload Identity.
 - A local operator-side reducer that validates the partial results and calculates the final estimate.
 
-## The Monte Carlo example, in plain language
+## The Monte Carlo example
 
 The supplied example prices a one-year **European call option**. It asks: *what is the value today of the right to buy an asset for 100 in one year, when the asset is currently 102?*
 
