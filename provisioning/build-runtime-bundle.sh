@@ -30,6 +30,12 @@ mcqs_note "Building the private operator runtime bundle"
 # provisioning tools, credentials, test tooling, or build artefacts.  Keep the
 # payload explicit so a new repository file is not accidentally copied to the
 # Bastion-reached workstation.
+MCQS_DOCUMENTATION_FILES=("${MCQS_BASENAME}/docs" "${MCQS_BASENAME}/profiles")
+if [[ -f "${MCQS_ROOT_DIR}/LICENSE" ]]; then
+  MCQS_DOCUMENTATION_FILES+=("${MCQS_BASENAME}/LICENSE")
+else
+  printf 'WARNING: LICENSE is absent from this checkout; omitting it from the runtime bundle.\n' >&2
+fi
 tar -C "$MCQS_PARENT_DIR" -czf "$MCQS_OPERATOR_BUNDLE" \
   --exclude='*/__pycache__' \
   "${MCQS_BASENAME}/app" \
@@ -43,8 +49,6 @@ tar -C "$MCQS_PARENT_DIR" -czf "$MCQS_OPERATOR_BUNDLE" \
   "${MCQS_BASENAME}/pyproject.toml" \
   "${MCQS_BASENAME}/README.md" \
   "${MCQS_BASENAME}/SECURITY.md" \
-  "${MCQS_BASENAME}/LICENSE" \
-  "${MCQS_BASENAME}/docs" \
-  "${MCQS_BASENAME}/profiles"
+  "${MCQS_DOCUMENTATION_FILES[@]}"
 
 printf 'Created %s\n' "$MCQS_OPERATOR_BUNDLE"
