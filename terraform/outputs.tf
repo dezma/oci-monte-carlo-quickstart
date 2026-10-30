@@ -49,12 +49,12 @@ output "bastion_client_cidr" {
 }
 
 output "operator_session_create_command" {
-  value       = "oci bastion session create-managed-ssh --bastion-id ${oci_bastion_bastion.operator.id} --target-resource-id ${oci_core_instance.operator.id} --target-os-username opc --target-port 22 --ssh-public-key-file $HOME/.ssh/id_ed25519.pub --session-ttl 3600 --wait-for-state SUCCEEDED"
+  value       = "oci bastion session create-managed-ssh --bastion-id ${oci_bastion_bastion.operator.id} --target-resource-id ${oci_core_instance.operator.id} --target-os-username opc --target-port 22 --ssh-public-key-file $HOME/.ssh/id_rsa.pub --session-ttl 3600 --wait-for-state SUCCEEDED"
   description = "Run from a workstation with OCI CLI and an SSH key. Then copy the SSH command from the Bastion session details."
 }
 
 output "operator_rbac_bastion_session_create_command" {
-  value       = "oci bastion session create-port-forwarding --bastion-id ${oci_bastion_bastion.operator.id} --target-private-ip ${oci_containerengine_cluster.this.endpoints[0].private_endpoint} --target-port 6443 --ssh-public-key-file $HOME/.ssh/id_ed25519.pub --session-ttl 3600 --wait-for-state SUCCEEDED"
+  value       = "oci bastion session create-port-forwarding --bastion-id ${oci_bastion_bastion.operator.id} --target-private-ip ${oci_containerengine_cluster.this.endpoints[0].private_endpoint} --target-port 6443 --ssh-public-key-file $HOME/.ssh/id_rsa.pub --session-ttl 3600 --wait-for-state SUCCEEDED"
   description = "Run only to apply operator_namespace_rbac_manifest as a tenancy administrator or Kubernetes cluster-admin. Then use the tunnel command displayed in the Bastion session details."
 }
 

@@ -28,6 +28,18 @@ Run any example through the private operator:
 
 For a European option, add an analytic Black-Scholes comparison to a model-validation notebook or test suite. Treat the Monte Carlo confidence interval as a numerical sampling check, not as evidence that the market inputs are correct.
 
+## Insurance and savings-product example
+
+The project also includes a first-class `insurance_savings` workload rather than trying to force policy cash flows into an option payoff. The synthetic unit-linked endowment example models monthly premiums and expenses, a stochastic fund account, mortality, surrender, and a maturity guarantee. Its reducer returns net-liability cash-flow measures and outcome probabilities, not an option `price`.
+
+Run it with:
+
+```bash
+./operator/run-insurance-savings.sh --parallelism 4
+```
+
+See [Synthetic insurance savings example](insurance-savings-example.md) for the precise cash-flow sequence, input definitions, output sign convention, limitations, and bounded stress grid. The example is a numerical and cloud-execution demonstration; it is not an actuarial or commercial model.
+
 ## Market-risk grid
 
 `examples/grids/market-risk-grid.json` expands a 3-by-3 spot/volatility sensitivity grid into nine reproducible European-call runs. Every scenario uses the same random seed, which supports more stable *relative* scenario comparisons through common random numbers. Each scenario still has a unique run ID and immutable result prefix.

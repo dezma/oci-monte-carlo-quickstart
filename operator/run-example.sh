@@ -75,6 +75,9 @@ fi
 SPEC_SIMULATIONS="$(jq -r '.simulations // empty' "$SPEC_FILE")"
 [[ "$SPEC_SIMULATIONS" =~ ^[1-9][0-9]*$ ]] || mcqs_fail "spec.simulations must be a positive integer."
 (( PARALLELISM <= SPEC_SIMULATIONS )) || mcqs_fail "parallelism cannot exceed simulations in the supplied spec."
+WORKLOAD_TYPE="$(jq -r '.workload_type // "option_pricing"' "$SPEC_FILE")"
+[[ "$WORKLOAD_TYPE" == "option_pricing" || "$WORKLOAD_TYPE" == "insurance_savings" ]] || \
+  mcqs_fail "spec.workload_type must be option_pricing or insurance_savings."
 MCQS_PYTHON="${MCQS_PYTHON:-python3}"
 for binary in helm kubectl jq "$MCQS_PYTHON"; do
   mcqs_require_command "$binary"
@@ -147,7 +150,11 @@ if ! kubectl -n "$MCQS_NAMESPACE" wait --for=condition=complete "job/${MCQS_JOB}
 fi
 
 mcqs_note "Aggregating immutable partial results"
-"${MCQS_OPERATOR_DIR}/aggregate-results.sh" \
+AGGREGATOR="${MCQS_OPERATOR_DIR}/aggregate-results.sh"
+if [[ "$WORKLOAD_TYPE" == "insurance_savings" ]]; then
+  AGGREGATOR="${MCQS_OPERATOR_DIR}/aggregate-insurance-savings-results.sh"
+fi
+"$AGGREGATOR" \
   --run-id "$MCQS_RUN_ID" \
   --expected-partitions "$PARALLELISM" \
   --confidence "$(jq -r '.confidence_level' "$MCQS_SPEC_COPY")"

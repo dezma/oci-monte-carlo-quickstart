@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oci-monte-carlo-quickstart"
-version = "1.0.0"
+version = "1.1.0"
 description = "Reproducible Monte Carlo jobs for OCI OKE"
 requires-python = ">=3.12"
 

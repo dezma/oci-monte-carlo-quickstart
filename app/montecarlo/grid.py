@@ -10,7 +10,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .spec import SpecError, load_spec
+from .spec import SpecError
+from .workloads import load_workload_spec
 
 _GRID_IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9-]{0,47}$")
 _ALLOWED_AXES = {
@@ -23,6 +24,16 @@ _ALLOWED_AXES = {
     "market.volatility",
     "market.maturity_years",
     "market.dividend_yield",
+    "fund.expected_annual_return",
+    "fund.annual_volatility",
+    "fund.annual_management_fee",
+    "policy.maturity_guarantee",
+    "policy.death_benefit",
+    "policy.surrender_charge_rate",
+    "policyholder_behavior.annual_lapse_rate",
+    "policyholder_behavior.lapse_rate_stress_multiplier",
+    "mortality.base_annual_mortality_rate",
+    "expenses.monthly_policy_expense",
 }
 
 
@@ -44,11 +55,12 @@ def _set_axis_value(spec: dict[str, Any], axis: str, value: Any) -> None:
     if axis not in _ALLOWED_AXES:
         allowed = ", ".join(sorted(_ALLOWED_AXES))
         raise GridError(f"unsupported grid axis {axis!r}; allowed axes are {allowed}")
-    if axis.startswith("market."):
-        market = spec.get("market")
-        if not isinstance(market, dict):
-            raise GridError("base_spec.market must be an object")
-        market[axis.removeprefix("market.")] = value
+    if "." in axis:
+        section, field = axis.split(".", maxsplit=1)
+        target = spec.get(section)
+        if not isinstance(target, dict):
+            raise GridError(f"base_spec.{section} must be an object")
+        target[field] = value
     else:
         spec[axis] = value
 
@@ -103,7 +115,7 @@ def render_grid(path: str | Path, output_dir: str | Path, max_scenarios: int) ->
         spec_path = destination / f"{scenario_id}.json"
         spec_path.write_text(json.dumps(spec, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         try:
-            validated = load_spec(spec_path)
+            validated = load_workload_spec(spec_path)
         except SpecError as error:
             raise GridError(f"scenario {scenario_id} is invalid: {error}") from error
         scenarios.append(

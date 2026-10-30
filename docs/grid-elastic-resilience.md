@@ -11,7 +11,7 @@ Kueue is the recommended optional queue layer when several people or grids share
 3. Submit `operator/run-grid.sh --queue-name monte-carlo-grid`.
 4. Inspect queued or admitted work with `operator/grid-status.sh --grid-id market-risk-demo`.
 
-The chart adds the Kueue queue label only when `--queue-name` is given. A regular `run-example.sh` invocation therefore remains independent of Kueue.
+The chart adds the Kueue queue label only when `--queue-name` is given. A regular `run-example.sh` invocation therefore remains independent of Kueue. The same queue mechanics apply to the option grid and the synthetic insurance-savings grid; the workload type changes the simulation and reducer contract, not admission control.
 
 ## Elastic managed-node capacity
 

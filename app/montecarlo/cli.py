@@ -9,8 +9,10 @@ import sys
 
 from . import __version__
 from .engine import run_partition
-from .spec import SpecError, load_spec
+from .insurance import InsuranceSavingsSpec, run_insurance_savings_partition
+from .spec import SpecError
 from .storage import write_result
+from .workloads import load_workload_spec
 
 
 def _integer_environment(name: str) -> int:
@@ -21,7 +23,7 @@ def _integer_environment(name: str) -> int:
 
 
 def _worker(arguments: argparse.Namespace) -> int:
-    spec = load_spec(arguments.spec)
+    spec = load_workload_spec(arguments.spec)
     index = (
         arguments.index
         if arguments.index is not None
@@ -32,7 +34,10 @@ def _worker(arguments: argparse.Namespace) -> int:
         if arguments.workers is not None
         else _integer_environment("JOB_COMPLETIONS")
     )
-    partial = run_partition(spec, index, workers, engine_version=__version__)
+    if isinstance(spec, InsuranceSavingsSpec):
+        partial = run_insurance_savings_partition(spec, index, workers, engine_version=__version__)
+    else:
+        partial = run_partition(spec, index, workers, engine_version=__version__)
     result = partial.to_dict()
     result["result_uri"] = write_result(result)
     print(json.dumps(result, sort_keys=True))

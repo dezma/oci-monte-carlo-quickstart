@@ -61,7 +61,7 @@ case "$ARCHITECTURE" in
 esac
 
 mcqs_note "Checking ${KUBERNETES_VERSION} against live OKE cluster options"
-CLUSTER_OPTIONS="$(oci ce cluster-option get \
+CLUSTER_OPTIONS="$(oci ce cluster-options get \
   --cluster-option-id all \
   --compartment-id "$COMPARTMENT_ID" \
   --output json)"

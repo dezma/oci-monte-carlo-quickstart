@@ -44,7 +44,7 @@ mcqs_require_command jq
 if [[ -z "$KUBERNETES_VERSION" ]]; then
   [[ -z "$NODE_SHAPE" && -z "$ARCHITECTURE" ]] || mcqs_fail "--node-shape and --architecture require --kubernetes-version."
   mcqs_note "Supported Kubernetes versions"
-  oci ce cluster-option get \
+  oci ce cluster-options get \
     --cluster-option-id all \
     --compartment-id "$COMPARTMENT_ID" \
     --query 'data."kubernetes-versions"' \

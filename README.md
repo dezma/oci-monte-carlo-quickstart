@@ -1,6 +1,6 @@
 # OCI Monte Carlo Quickstart
 
-Deploy and run a secure, repeatable Monte Carlo option-pricing example on OCI.
+Deploy and run secure, repeatable Monte Carlo derivative-pricing and synthetic insurance-savings examples on OCI.
 
 The quickstart creates a private OKE environment for the workers and a private operator VM for the person running the workload. It is designed to help a quant, developer, cloud engineer, or security reviewer reach the same clear outcome: a reproducible estimate, a confidence interval, and the evidence needed to understand what produced it.
 
@@ -94,6 +94,22 @@ The input is [examples/sample-simulation.json](examples/sample-simulation.json).
 
 The output validates numerical uncertainty under this model. It does not validate market assumptions, liquidity, calibration, or suitability for a trading decision.
 
+## Synthetic insurance-savings example
+
+The quickstart also includes a simple ten-year **savings policy with insurance cover**. Think of it as a savings account funded by an initial payment and monthly payments. The balance is invested, so it can rise or fall. A small fee is taken from the balance. The policy can end early if the customer dies or withdraws their money. If it reaches the end of ten years, the customer receives the higher of the investment balance and a promised minimum amount.
+
+The supplied figures are fictional so that you can safely change them and see how the result responds.
+
+For every simulated policy, the model asks: *what investment return happened, did the policy end early, and what payment was made?* It runs that story many times and averages the answers.
+
+```bash
+./operator/run-insurance-savings.sh --parallelism 4
+```
+
+The result shows the average value of customer payments, premiums received, and running costs. It also shows **net liability**: customer payments plus costs, minus premiums received. A positive number means that, under the chosen assumptions, payments and costs are greater than premiums.
+
+It also reports the chance that a policy reaches the end, ends through withdrawal, ends through a death claim, or needs a top-up because the promised minimum is higher than the investment balance. See the [insurance-savings example guide](docs/insurance-savings-example.md) for a plain-language explanation of every input and output, plus a nine-scenario stress grid.
+
 ## Guided deployment
 
 ### 1. Choose a live-compatible OKE configuration
@@ -149,7 +165,7 @@ When the stack completes, create a Managed SSH session using the `operator_sessi
 
 ```bash
 mkdir -p ~/.ssh
-test -f ~/.ssh/id_ed25519.pub || ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519
+test -f ~/.ssh/id_rsa.pub || ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
 ```
 
 Connect to the resulting Bastion session as `opc`.
@@ -214,6 +230,7 @@ Copy the relevant values into the Resource Manager form or a local `terraform.tf
 | Understand the trust boundaries and component flow | [Architecture](docs/architecture.md) |
 | Follow the end-to-end provisioning and operator sequence | [Provisioning and operator guide](docs/provisioning-and-operator.md) |
 | Run additional derivative products and a market-risk sensitivity grid | [Financial examples](docs/financial-examples.md) |
+| Run and interpret the synthetic insurance-savings workload and stress grid | [Insurance savings example](docs/insurance-savings-example.md) |
 | Demonstrate Kueue scheduling, autoscaled capacity, and worker recovery | [Grid, elastic capacity, and resilience](docs/grid-elastic-resilience.md) |
 | Select a current CPU, HPC, or Acceleron shape | [Shape catalogue](docs/shape-catalog.md) and `provisioning/list-shapes.sh` |
 | Explain the user journey and onboarding choices | [Human-centered design](docs/human-centered-design.md) |

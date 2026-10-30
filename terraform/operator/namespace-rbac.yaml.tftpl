@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${kubernetes_namespace}
+  labels:
+    app.kubernetes.io/part-of: oci-monte-carlo-quickstart
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mcqs-operator-runtime
+  namespace: ${kubernetes_namespace}
+  labels:
+    app.kubernetes.io/part-of: oci-monte-carlo-quickstart
+rules:
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - events
+      - pods
+      - secrets
+      - serviceaccounts
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mcqs-operator-runtime
+  namespace: ${kubernetes_namespace}
+  labels:
+    app.kubernetes.io/part-of: oci-monte-carlo-quickstart
+subjects:
+  - kind: Group
+    name: ${operator_dynamic_group_ocid}
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mcqs-operator-runtime
