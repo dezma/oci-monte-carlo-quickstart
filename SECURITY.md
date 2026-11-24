@@ -7,12 +7,11 @@ This project is an accelerator, not a replacement for a customer's landing-zone 
 ## Controls implemented in code
 
 - Private OKE API endpoint, worker nodes, pods, OCIR repository, Object Storage bucket, and operator workstation. OCI Bastion Managed SSH is the only interactive path.
-- Network Security Groups separated for control-plane endpoint, workers, and pods.
-- Enhanced OKE plus a workload-scoped IAM policy for the exact namespace, service account, cluster, result bucket, and write-only result prefix. The operator instance-principal policy is scoped to the created cluster and bootstrap/result objects. The application uses conditional create to prevent a partial result from being overwritten.
-- Workload Identity in the application; no OCI user credentials in containers.
+- Default FSS result delivery: worker nodes and the operator reach a private mount target through restricted NSGs and export options. Worker clients are mapped to UID/GID `10001`; the simulator receives no service-account token for OCI result access. The application publishes each final name atomically. Treat the shared export as a node-level trust boundary, not a per-run credential or retention lock.
+- Optional Object Storage result delivery: the worker uses OKE Workload Identity for the configured cluster, namespace and ServiceAccount. Its write policy is limited to the bucket and result prefix. The operator reads results with its own instance principal. No user API keys are placed in worker containers.
 - Namespace labels that enforce the Kubernetes Pod Security `restricted` profile.
 - Non-root workload, immutable root filesystem, dropped Linux capabilities, `RuntimeDefault` seccomp profile, explicit resource limits, and no privilege escalation.
-- Namespace-wide default-deny ingress and egress NetworkPolicy. Only simulator pods receive DNS and TCP/443 egress; validate CNI enforcement and tighten this further to landing-zone-approved OCI endpoints where required.
+- Namespace-wide default-deny ingress and egress NetworkPolicy. In FSS mode the simulator needs no Pod network egress for publishing; NFS runs from the worker node. In Object Storage mode the simulator policy allows DNS and TCP/443. Validate CNI enforcement and restrict destinations to approved endpoints where required.
 - Image digest required by the Helm chart. Tags are not accepted for deployed jobs.
 - Bootstrap bundle SHA-256 verification, verified single-stream Object Storage download, checksum-verified kubectl/Helm installation, and a visible operator bootstrap status record.
 - Interactive OCIR auth-token prompts; tokens are not passed as environment variables, Terraform values, or shell arguments. The Kubernetes pull secret is created from a temporary Docker configuration.

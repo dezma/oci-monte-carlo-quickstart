@@ -53,11 +53,14 @@ esac
 dnf -y install \
   oraclelinux-developer-release-el8 \
   dnf-plugins-core \
-  curl git gzip jq tar unzip \
+  curl git gzip jq tar unzip nfs-utils \
   python36-oci-cli \
   python3.12 python3.12-pip python3.12-setuptools python3.12-wheel
 dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-dnf -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+# Oracle Linux can include a container-runtime package that conflicts with the
+# Docker CE containerd dependency. This operator is dedicated to the
+# quickstart, so permit DNF to replace that conflicting runtime package.
+dnf -y install --allowerasing docker-ce docker-ce-cli containerd.io docker-buildx-plugin
 systemctl enable --now docker
 usermod -aG docker opc
 
@@ -76,11 +79,63 @@ export MCQS_IMAGE_REPOSITORY='${image_repository}'
 export MCQS_NAMESPACE='${kubernetes_namespace}'
 export MCQS_SERVICE_ACCOUNT='${service_account_name}'
 export MCQS_NODE_ARCHITECTURE='${node_architecture}'
+export MCQS_KUBERNETES_ACCESS_MODE='${kubernetes_access_mode}'
+export MCQS_RESULT_DELIVERY_MODE='${result_delivery_mode}'
+export MCQS_FSS_RESULTS_DIR='${fss_operator_mount_path}'
+export MCQS_FSS_VOLUME_HANDLE='${fss_volume_handle}'
+export MCQS_FSS_PERSISTENT_VOLUME_NAME='${fss_persistent_volume_name}'
+export MCQS_FSS_PERSISTENT_VOLUME_CLAIM_NAME='${fss_persistent_volume_claim_name}'
+export MCQS_FSS_PERSISTENT_VOLUME_CAPACITY='${fss_persistent_volume_capacity}'
+export MCQS_FSS_MOUNT_TARGET_IP='${fss_mount_target_ip}'
+export MCQS_FSS_EXPORT_PATH='${fss_export_path}'
+export MCQS_BENCHMARK_POOL_CONFIG='/etc/mcqs-benchmark-pools.json'
 export OCI_TENANCY_NAMESPACE='${namespace}'
 export KUBECONFIG=/home/opc/.kube/config
 export MCQS_PYTHON=/home/opc/.mcqs-venv/bin/python
 ENVIRONMENT
 chmod 0644 /etc/profile.d/mcqs-runtime.sh
+
+# Node labels are created by the OKE node-pool API. OKE's Terraform node-pool
+# resource does not expose a persistent Kubernetes taint field, so retain the
+# Terraform-defined profile and taint intent for operator-side reconciliation
+# before a benchmark. This file contains no credentials or sensitive data.
+printf '%s' '${benchmark_node_pool_profiles_b64}' | base64 -d > /etc/mcqs-benchmark-pools.json
+chown root:opc /etc/mcqs-benchmark-pools.json
+chmod 0640 /etc/mcqs-benchmark-pools.json
+
+if [[ '${fss_enabled}' == 'true' ]]; then
+  # The operator has a dedicated, unsquashed export option so it can create
+  # the shared run tree. Workers are separately all-squashed to UID/GID 10001.
+  # Adding opc to this local group makes completed partials group-readable in
+  # a newly opened Bastion session without making the container run as root.
+  if ! getent group 10001 >/dev/null; then
+    groupadd --gid 10001 montecarlo
+  fi
+  FSS_RESULTS_GROUP="$(getent group 10001 | awk -F: '{print $1}')"
+  usermod -aG "$${FSS_RESULTS_GROUP}" opc
+
+  FSS_MOUNT_TARGET_IP='${fss_mount_target_ip}'
+  FSS_EXPORT_PATH='${fss_export_path}'
+  FSS_RESULTS_DIR='${fss_operator_mount_path}'
+  install -d -m 0750 -o opc -g opc "$${FSS_RESULTS_DIR}"
+
+  for attempt in $(seq 1 40); do
+    if mountpoint -q "$${FSS_RESULTS_DIR}" || \
+      mount -t nfs -o vers=3,nosuid,nodev,noexec \
+        "$${FSS_MOUNT_TARGET_IP}:$${FSS_EXPORT_PATH}" "$${FSS_RESULTS_DIR}"; then
+      break
+    fi
+    if [[ "$${attempt}" == 40 ]]; then
+      echo "Unable to mount the private FSS result export after waiting for it to become available."
+      exit 1
+    fi
+    sleep 15
+  done
+
+  FSS_FSTAB_ENTRY="$${FSS_MOUNT_TARGET_IP}:$${FSS_EXPORT_PATH} $${FSS_RESULTS_DIR} nfs vers=3,_netdev,nosuid,nodev,noexec 0 0"
+  grep -Fqx "$${FSS_FSTAB_ENTRY}" /etc/fstab || printf '%s\n' "$${FSS_FSTAB_ENTRY}" >>/etc/fstab
+  install -d -m 2770 -o 10001 -g 10001 "$${FSS_RESULTS_DIR}/runs"
+fi
 
 BUNDLE_FILE=/tmp/mcqs-quickstart.tar.gz
 BUNDLE_SHA256='${bundle_sha256}'
@@ -181,9 +236,11 @@ for attempt in $(seq 1 40); do
     --token-version 2.0.0 \
     --kube-endpoint PRIVATE_ENDPOINT \
     --auth instance_principal \
-    --with-auth-context >/dev/null && \
-    sudo -H -u opc env OCI_CLI_AUTH=instance_principal OCI_REGION="$OCI_REGION" KUBECONFIG=/home/opc/.kube/config /usr/local/bin/kubectl cluster-info >/dev/null; then
-    break
+    --with-auth-context >/dev/null; then
+    if [[ '${kubernetes_access_mode}' == 'namespace_rbac' ]] || \
+      sudo -H -u opc env OCI_CLI_AUTH=instance_principal OCI_REGION="$OCI_REGION" KUBECONFIG=/home/opc/.kube/config /usr/local/bin/kubectl cluster-info >/dev/null; then
+      break
+    fi
   fi
   if [[ "$attempt" == 40 ]]; then
     echo "The operator could not create a working kubeconfig after waiting for OKE and IAM propagation."
@@ -192,7 +249,11 @@ for attempt in $(seq 1 40); do
   sleep 15
 done
 
-sudo -H -u opc bash -lc 'source /etc/profile.d/mcqs-runtime.sh; cd /home/opc/oci-monte-carlo-quickstart; python3.12 -m venv /home/opc/.mcqs-venv; /home/opc/.mcqs-venv/bin/pip install --disable-pip-version-check --no-cache-dir -r requirements.txt; /usr/local/bin/kubectl cluster-info'
+sudo -H -u opc bash -lc 'source /etc/profile.d/mcqs-runtime.sh; cd /home/opc/oci-monte-carlo-quickstart; python3.12 -m venv /home/opc/.mcqs-venv; /home/opc/.mcqs-venv/bin/pip install --disable-pip-version-check --no-cache-dir -r requirements.txt'
+
+if [[ '${kubernetes_access_mode}' == 'iam_admin' ]]; then
+  sudo -H -u opc bash -lc 'source /etc/profile.d/mcqs-runtime.sh; /usr/local/bin/kubectl cluster-info'
+fi
 
 touch "$BOOTSTRAP_READY_FILE"
 chown opc:opc "$BOOTSTRAP_READY_FILE"

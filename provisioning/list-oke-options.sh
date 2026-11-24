@@ -8,11 +8,16 @@ COMPARTMENT_ID=""
 NODE_SHAPE=""
 KUBERNETES_VERSION=""
 ARCHITECTURE=""
+REGION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --compartment-id)
       COMPARTMENT_ID="${2:-}"
+      shift 2
+      ;;
+    --region)
+      REGION="${2:-}"
       shift 2
       ;;
     --node-shape)
@@ -28,7 +33,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help|-h)
-      printf 'Usage: %s --compartment-id <ocid> [--node-shape <shape> --architecture amd64|arm64 --kubernetes-version <version>]\n\nWithout a version, lists supported OKE versions. With a shape, architecture, and version, lists compatible Oracle Linux 8 node image OCIDs.\n' "$0"
+      printf 'Usage: %s --compartment-id <ocid> [--region <region>] [--node-shape <shape> --architecture amd64|arm64 --kubernetes-version <version>]\n\nWithout a version, lists supported OKE versions. With a shape, architecture, and version, lists compatible Oracle Linux 8 node image OCIDs.\n' "$0"
       exit 0
       ;;
     *)
@@ -41,10 +46,15 @@ done
 mcqs_require_command oci
 mcqs_require_command jq
 
+OCI_REGION_ARGS=()
+if [[ -n "$REGION" ]]; then
+  OCI_REGION_ARGS=(--region "$REGION")
+fi
+
 if [[ -z "$KUBERNETES_VERSION" ]]; then
   [[ -z "$NODE_SHAPE" && -z "$ARCHITECTURE" ]] || mcqs_fail "--node-shape and --architecture require --kubernetes-version."
   mcqs_note "Supported Kubernetes versions"
-  oci ce cluster-options get \
+  oci "${OCI_REGION_ARGS[@]}" ce cluster-options get \
     --cluster-option-id all \
     --compartment-id "$COMPARTMENT_ID" \
     --query 'data."kubernetes-versions"' \
@@ -68,8 +78,8 @@ case "$ARCHITECTURE" in
   arm64) NODE_ARCH="AARCH64" ;;
 esac
 
-mcqs_note "Compatible Oracle Linux 8 images for ${NODE_SHAPE} (${NODE_ARCH}) and ${KUBERNETES_VERSION}"
-oci ce node-pool-options get \
+mcqs_note "Compatible Oracle Linux 8 images for ${NODE_SHAPE} (${NODE_ARCH}) and ${KUBERNETES_VERSION}${REGION:+ in ${REGION}}"
+oci "${OCI_REGION_ARGS[@]}" ce node-pool-options get \
   --node-pool-option-id all \
   --compartment-id "$COMPARTMENT_ID" \
   --node-pool-k8s-version "$KUBERNETES_VERSION" \

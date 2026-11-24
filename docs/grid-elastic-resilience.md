@@ -47,6 +47,6 @@ kubectl -n monte-carlo get pods -l monte-carlo.oracle.com/run-id='<run-id>'
 kubectl -n monte-carlo delete pod '<one-test-pod>'
 ```
 
-The worker writes result objects with a write-once precondition. If a Pod is interrupted after a successful write, a retry verifies the existing immutable partition content before treating it as complete. The final reducer still requires exactly one valid partial result for every expected index.
+A replacement worker takes the same partition index and publishes to the same run path. The FSS writer links the completed file without replacing it and compares deterministic fields if the name already exists. In Object Storage mode it uses a conditional create, not an overwrite. The reducer requires one valid partial for every expected index. See the [two result paths](fss-result-delivery.md).
 
-Do not drain production nodes or terminate worker instances to demonstrate this behaviour. Use a short-lived dedicated test run and remove its Helm release after reviewing the events and result objects.
+Do not drain production nodes or terminate worker instances to demonstrate this behaviour. Use a short-lived dedicated test run and remove its Helm release after reviewing the events and partition results.

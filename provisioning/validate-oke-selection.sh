@@ -9,11 +9,16 @@ NODE_SHAPE=""
 ARCHITECTURE=""
 KUBERNETES_VERSION=""
 NODE_IMAGE_ID=""
+REGION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --compartment-id)
       COMPARTMENT_ID="${2:-}"
+      shift 2
+      ;;
+    --region)
+      REGION="${2:-}"
       shift 2
       ;;
     --node-shape)
@@ -33,7 +38,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help|-h)
-      printf 'Usage: %s --compartment-id <ocid> --node-shape <shape> --architecture amd64|arm64 --kubernetes-version <full-version> --node-image-id <image-ocid>\n\nValidates the selected full OKE patch version and Oracle Linux 8 node image against live OCI control-plane options before Resource Manager provisioning.\n' "$0"
+      printf 'Usage: %s --compartment-id <ocid> [--region <region>] --node-shape <shape> --architecture amd64|arm64 --kubernetes-version <full-version> --node-image-id <image-ocid>\n\nValidates the selected full OKE patch version and Oracle Linux 8 node image against live OCI control-plane options before Resource Manager provisioning.\n' "$0"
       exit 0
       ;;
     *)
@@ -55,13 +60,18 @@ done
 mcqs_require_command oci
 mcqs_require_command jq
 
+OCI_REGION_ARGS=()
+if [[ -n "$REGION" ]]; then
+  OCI_REGION_ARGS=(--region "$REGION")
+fi
+
 case "$ARCHITECTURE" in
   amd64) NODE_POOL_ARCH="X86_64" ;;
   arm64) NODE_POOL_ARCH="AARCH64" ;;
 esac
 
 mcqs_note "Checking ${KUBERNETES_VERSION} against live OKE cluster options"
-CLUSTER_OPTIONS="$(oci ce cluster-options get \
+CLUSTER_OPTIONS="$(oci "${OCI_REGION_ARGS[@]}" ce cluster-options get \
   --cluster-option-id all \
   --compartment-id "$COMPARTMENT_ID" \
   --output json)"
@@ -73,7 +83,7 @@ if ! jq -e --arg requested "$KUBERNETES_VERSION" '
 fi
 
 mcqs_note "Checking the ${ARCHITECTURE} Oracle Linux 8 node image"
-NODE_OPTIONS="$(oci ce node-pool-options get \
+NODE_OPTIONS="$(oci "${OCI_REGION_ARGS[@]}" ce node-pool-options get \
   --node-pool-option-id all \
   --compartment-id "$COMPARTMENT_ID" \
   --node-pool-k8s-version "$KUBERNETES_VERSION" \

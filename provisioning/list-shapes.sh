@@ -7,6 +7,7 @@ source "$(cd -- "$(dirname -- "$0")/.." && pwd -P)/scripts/lib.sh"
 COMPARTMENT_ID=""
 AVAILABILITY_DOMAIN=""
 FILTER=""
+REGION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -18,12 +19,16 @@ while [[ $# -gt 0 ]]; do
       AVAILABILITY_DOMAIN="${2:-}"
       shift 2
       ;;
+    --region)
+      REGION="${2:-}"
+      shift 2
+      ;;
     --filter)
       FILTER="${2:-}"
       shift 2
       ;;
     --help|-h)
-      printf 'Usage: %s --compartment-id <ocid> [--availability-domain <name>] [--filter <text>]\n' "$0"
+      printf 'Usage: %s --compartment-id <ocid> [--region <region>] [--availability-domain <name>] [--filter <text>]\n' "$0"
       exit 0
       ;;
     *)
@@ -36,12 +41,17 @@ done
 mcqs_require_command oci
 mcqs_require_command jq
 
-if [[ -z "$AVAILABILITY_DOMAIN" ]]; then
-  AVAILABILITY_DOMAIN="$(oci iam availability-domain list --compartment-id "$COMPARTMENT_ID" --query 'data[0].name' --raw-output)"
+OCI_REGION_ARGS=()
+if [[ -n "$REGION" ]]; then
+  OCI_REGION_ARGS=(--region "$REGION")
 fi
 
-mcqs_note "Shapes reported by OCI for ${AVAILABILITY_DOMAIN}"
-SHAPES_JSON="$(oci compute shape list --compartment-id "$COMPARTMENT_ID" --availability-domain "$AVAILABILITY_DOMAIN" --all --output json)"
+if [[ -z "$AVAILABILITY_DOMAIN" ]]; then
+  AVAILABILITY_DOMAIN="$(oci "${OCI_REGION_ARGS[@]}" iam availability-domain list --compartment-id "$COMPARTMENT_ID" --query 'data[0].name' --raw-output)"
+fi
+
+mcqs_note "Shapes reported by OCI for ${AVAILABILITY_DOMAIN}${REGION:+ in ${REGION}}"
+SHAPES_JSON="$(oci "${OCI_REGION_ARGS[@]}" compute shape list --compartment-id "$COMPARTMENT_ID" --availability-domain "$AVAILABILITY_DOMAIN" --all --output json)"
 
 if [[ -n "$FILTER" ]]; then
   jq --arg filter "$FILTER" '

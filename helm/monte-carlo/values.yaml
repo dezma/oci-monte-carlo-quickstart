@@ -20,6 +20,19 @@ objectStorage:
   prefix: monte-carlo
   region: ""
 
+# Result delivery is selected when the Terraform stack is created. The
+# quickstart Terraform default is FSS; this chart retains an explicit
+# Object Storage mode for platform designs that choose it. FSS mounts an OCI
+# File Storage export through the OKE FSS CSI driver and does not give worker
+# Pods Object Storage access.
+resultDelivery:
+  mode: fss
+  fss:
+    volumeHandle: ""
+    persistentVolumeName: ""
+    claimName: monte-carlo-results
+    capacity: 50Gi
+
 nodeSelector: {}
 tolerations: []
 
@@ -43,6 +56,13 @@ run:
   queueName: ""
   gridId: ""
   scenarioId: ""
+  benchmarkId: ""
+  benchmarkProfile: ""
+  benchmarkPhase: ""
+  # Benchmark runs can request deterministic host spreading. The benchmark
+  # wrapper enables this; ordinary simulation and grid runs leave it disabled.
+  topologySpread:
+    enabled: false
   activeDeadlineSeconds: 3600
   ttlSecondsAfterFinished: 3600
 

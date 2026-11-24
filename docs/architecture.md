@@ -1,48 +1,41 @@
-# Architecture and execution model
+# Architecture: from submission to result
 
-The quickstart has two intentionally different planes. A local provisioning workstation (with OCI Cloud Shell as an optional convenience) discovers current OCI choices and drives Resource Manager. A Bastion-reached private operator VM executes the runtime against the private cluster.
+OCI Resource Manager provisions the private environment. To run a simulation, connect through OCI Bastion to the operator VM. The operator submits the work to Kubernetes and reads back the results; Cloud Shell is not on that path.
 
-![OCI Monte Carlo Quickstart architecture](architecture.svg)
+![Private OCI topology showing Bastion access, the operator, OKE workers, private image pulls and the shared File Storage result path.](architecture.svg)
 
-The diagram uses the quickstart's default private CIDR layout. It is an implementation view, not a capacity topology: the selected worker shape, worker count, and Availability Domain are supplied during provisioning.
+[Download the overview as PNG](architecture.png) · [Provision the infrastructure and run your first job](provisioning-and-operator.md)
 
-```mermaid
-flowchart TD
-  P["Provisioning plane\n(local CLI or optional Cloud Shell)"] --> RM["Resource Manager"]
-  RM --> I["Private infrastructure"]
-  I --> B["OCI Bastion"]
-  I --> O["Private operator VM"]
-  B --> O
-  O --> K["Private OKE API"]
-  K --> J["Indexed Monte Carlo Job"]
-  J --> S["Private Object Storage"]
-  O --> R["Private OCIR"]
-```
+## Follow one run
 
-Resource Manager creates the infrastructure only: private enhanced OKE, private networking, OCI Bastion, the private operator VM, OCIR, Object Storage, and supporting IAM and observability resources. Image publishing, Helm baseline installation, image-pull-secret creation, job submission, status inspection, and result aggregation all run from the operator VM.
+1. **Prepare the environment.** Terraform creates the private OKE API endpoint, managed worker pool, Bastion, operator, registry and bootstrap bucket. Dedicated benchmark pools are optional. In the default File Storage mode it also creates the filesystem, mount target, export and network rules. The operator downloads its runtime bundle from the private bucket in **both** modes.
+2. **Submit the simulation.** From the operator, install the shared Helm baseline, publish or select a digest-pinned image in OCIR, and create the namespace pull secret. Each submission adds an immutable input ConfigMap and an Indexed Job. Kubernetes gives each worker a distinct partition of the model paths; there is no broker to install.
+3. **Publish the partitions.** Each worker produces one small JSON partial, not a file per path. With FSS, the node's CSI driver mounts the export for the Pod. The operator mounts that same export independently. With Object Storage, the worker instead calls an OCI API.
+4. **Read the result.** The reducer on the operator checks the run ID, input hash and partition set before combining the partials. A derivative run produces a price estimate; an insurance run produces a net liability estimate and event probabilities. A benchmark separately records elapsed time and throughput in reports on the operator, outside the shared export by default.
 
-## Live OKE compatibility boundary
+## Where the partials go
 
-The provisioning plane must query OCI immediately before an Apply. Shape availability, OKE supported versions, node images, and capacity are live provider facts rather than a static catalogue. Select a full Kubernetes patch version from the live OKE response and pair it with an image from that same response. The selected node image must match the exact OKE version and selected node architecture (`amd64` for Intel/AMD or `arm64` for Ampere). Neither the Kubernetes version nor node image is an optional default.
+![Two alternative delivery paths: a shared NFS export mounted at different paths, or a private bucket accessed with separate worker and reader identities.](result-delivery.svg)
 
-## Trust boundaries
+| | File Storage (`fss`, default) | Object Storage (`object_storage`) |
+|---|---|---|
+| Worker publishes | Under `/results/runs/<run-id>/partials/` via a static read/write-many volume | Under `<prefix>/runs/<run-id>/partials/` in the bucket, using a conditional create |
+| Operator reads | Same files under `/mnt/mcqs-results` by default | Lists and reads the run prefix with its instance principal |
+| Access boundary | Worker-node and operator network rules and FSS export options; no worker OCI token for results | OKE Workload Identity scoped to the cluster, namespace and ServiceAccount, with a bucket/prefix write policy |
+| Before timing a benchmark | The runner tests the claim from two selected worker nodes. A bound claim alone does not prove a worker can write. | No FSS probe; workers need the configured Object Storage access. |
 
-- A human uses OCI IAM and a time-limited Bastion Managed SSH session to reach the private operator VM. The operator uses an instance principal, not stored OCI API keys, to generate a kubeconfig for the private OKE endpoint. The stack makes Kubernetes authorization explicit: the quickstart `iam_admin` mode scopes OKE `manage clusters` to this one cluster; the `namespace_rbac` mode retains `use clusters` and requires a one-time namespace-scoped RoleBinding applied by a cluster administrator.
-- The provisioning plane has no runtime role. Cloud Shell, when used, is not a private-cluster runtime or an alternate route to the OKE API.
-- Pods use only the workload identity defined by the cluster, namespace, and ServiceAccount. They do not receive user API keys or an operator credential.
-- OCIR image pulls use a namespace-scoped pull secret. That credential is distinct from the operator's instance principal and must be rotated outside Terraform and source control.
-- The Object Storage policy permits creation of results only under the configured run prefix. Workers cannot rewrite a completed partial object.
+[Download the result flow as PNG](result-delivery.png) · [Mount paths, checks and retention](fss-result-delivery.md)
 
-## Immutable execution and aggregation
+## Network and ownership
 
-The baseline Helm release owns the shared ServiceAccount. Each submission gets a unique run ID, run-specific Helm release, immutable input ConfigMap, and an Indexed Job. The Job is pinned to `repository@sha256:...`, never a mutable image tag, and uses a single node architecture for that run.
+The default VCN is `10.42.0.0/16`. Its private subnets separate the OKE API (`10.42.0.0/28`), workers (`10.42.1.0/24`), Pods (`10.42.16.0/20`), service load balancers (`10.42.32.0/24`), operator (`10.42.48.0/28`), Bastion endpoint (`10.42.49.0/28`) and FSS mount target (`10.42.50.0/28`). The baseline does not publish an application or monitoring ingress.
 
-Each partition records the canonical input SHA-256, deterministic seed stream, partition index, engine version, elapsed time, and additive payoff moments. It writes a partial object exactly once. The operator aggregates only the partials for one run after checking the run ID, input hash, and expected partition set, then computes the price and confidence interval from those additive moments.
+The operator uses an instance principal for OCI access. The registry pull secret is separate; it is not a worker credential for writing results. For FSS, select `iam_admin`: the Helm baseline needs to create a cluster-scoped PersistentVolume. Worker placement, operator placement and FSS placement can be set independently. Review proposed replacements before applying stack updates.
 
-## Why Indexed Jobs, not a permanent broker fleet
+## Optional layers
 
-European vanilla Monte Carlo simulation is embarrassingly parallel. A Kubernetes Indexed Job supplies stable partition indexes, bounded retries, resource accounting, and a completion signal without exposing a message broker or management console. A managed queue or broker can be added later for a long-lived, multi-tenant submission service; it is intentionally outside this quickstart.
+- [Benchmark profiles](shape-benchmarking.md) isolate a shape with node labels and taints. The strict suite runs eligible profiles sequentially; an SSH disconnect does not stop a detached suite, but replacing the operator can.
+- [Kueue and elastic capacity](grid-elastic-resilience.md) address different waits: Kueue admits a Job against quota; the autoscaler adjusts eligible managed pools when Pods cannot fit. Neither is required for an ordinary Indexed Job.
+- [Private monitoring](observability.md) adds Prometheus, Grafana, kube-state-metrics and node-exporter. Use the private operator port-forward for Grafana. Monitoring is opt-in, not a side effect of provisioning a logging group.
 
-## Observability
-
-Workers write structured result records and errors to standard output/error. Enable OKE cluster logging for the target tenancy and route alerts to the log group created by Terraform. Monitor job failures and duration, Object Storage write failures, OCPU consumption, capacity failures, and Bastion session use as separate signals.
+For a new environment, [discover a live-supported Kubernetes patch, node shape and image](provisioning-and-operator.md) in the target region. For security review, start with the [threat model](threat-model.md).

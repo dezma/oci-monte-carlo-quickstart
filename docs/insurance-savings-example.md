@@ -48,6 +48,24 @@ You can copy the input, change a value, and run your version with the normal com
 
 `--parallelism` changes how many parts run at the same time. It does not change the number of simulated policy stories. Increase `simulations` when you want a steadier average.
 
+### Progress and expected duration
+
+With the supplied 200,000-policy input and four workers, calculation normally completes in well under a few minutes after the image is already available on the nodes. The first run can take longer because Kubernetes may need to pull the container image, schedule Pods, or wait for available capacity. Duration depends on the selected shape, worker requests, cluster load, image-pull state, and the time to publish each partial (to FSS by default, or to Object Storage); treat the first run as an environment check, not a performance measure.
+
+While waiting, `run-insurance-savings.sh` now displays an Indexed Job progress bar. It shows completed worker partitions, active/failed Jobs, Pod phases, elapsed time, and time since the last observed change. A partition advances the bar only after it writes its immutable partial result, so the display does not claim path-level progress that the simulation has not durably recorded.
+
+For a longer-running experiment, submit without waiting and use the monitor command returned by the runner:
+
+```bash
+./operator/run-insurance-savings.sh --parallelism 4 --no-wait
+./operator/watch-run.sh \
+  --job '<job-name>' \
+  --run-id '<run-id>' \
+  --partitions 4
+```
+
+Use `--progress-interval 10` to refresh every ten seconds, or `--no-progress` when output is being captured by another tool.
+
 ## Output and interpretation
 
 The result is JSON. All monetary amounts use the same unit as the input, such as dollars, shillings, or euros.

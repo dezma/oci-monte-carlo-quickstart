@@ -20,3 +20,11 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- define "monte-carlo.runName" -}}
 {{- printf "%s-%s" .Release.Name .Values.run.id | trunc 58 | trimSuffix "-" }}
 {{- end }}
+
+{{- define "monte-carlo.resultDeliveryMode" -}}
+{{- $mode := default "fss" .Values.resultDelivery.mode -}}
+{{- if not (has $mode (list "object_storage" "fss")) -}}
+{{- fail "resultDelivery.mode must be object_storage or fss" -}}
+{{- end -}}
+{{- $mode -}}
+{{- end }}

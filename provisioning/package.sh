@@ -47,6 +47,7 @@ mcqs_note "Packaging the deployable quickstart"
        "${MCQS_BASENAME}/terraform/terraform.tfvars" \
        "${MCQS_BASENAME}/.kube/*" \
        "${MCQS_BASENAME}/.mcqs-*" \
+       "${MCQS_BASENAME}/benchmark-results/*" \
        "${MCQS_BASENAME}/dist/*"
 )
 printf 'Created %s\n' "$MCQS_ARCHIVE"

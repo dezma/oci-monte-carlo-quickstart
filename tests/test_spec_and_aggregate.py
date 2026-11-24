@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from montecarlo.aggregate import aggregate, main
+from montecarlo.aggregate import aggregate, fetch_filesystem_partials, main
 from montecarlo.spec import SpecError, load_spec
 
 SPEC_PATH = Path(__file__).parents[1] / "examples" / "sample-simulation.json"
@@ -110,3 +110,23 @@ def test_spec_rejects_unsafe_run_identifier(tmp_path: Path) -> None:
     invalid_spec.write_text('{"run_id":"../bad"}', encoding="utf-8")
     with pytest.raises(SpecError, match="run_id may contain"):
         load_spec(invalid_spec)
+
+
+def test_fetch_filesystem_partials_reads_only_one_run(tmp_path: Path) -> None:
+    partial_directory = tmp_path / "runs" / "test-run" / "partials"
+    partial_directory.mkdir(parents=True)
+    (partial_directory / "part-00001.json").write_text('{"partition":1}', encoding="utf-8")
+    (partial_directory / "part-00000.json").write_text('{"partition":0}', encoding="utf-8")
+    other = tmp_path / "runs" / "other-run" / "partials"
+    other.mkdir(parents=True)
+    (other / "part-00000.json").write_text('{"partition":99}', encoding="utf-8")
+
+    assert fetch_filesystem_partials(str(tmp_path), "test-run") == [
+        {"partition": 0},
+        {"partition": 1},
+    ]
+
+
+def test_aggregate_cli_requires_run_id_for_fss(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="--run-id is required"):
+        main(["--results-dir", str(tmp_path)])

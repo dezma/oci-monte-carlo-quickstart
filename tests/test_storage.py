@@ -96,3 +96,40 @@ def test_write_result_accepts_matching_immutable_result_from_retry(
     monkeypatch.setenv("OCI_REGION", "eu-frankfurt-1")
 
     assert write_result(result) == "oci://results/monte-carlo/runs/test-run/partials/part-00000.json"
+
+
+def test_write_result_publishes_an_immutable_fss_partial(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.setenv("MCQS_RESULT_DELIVERY_MODE", "fss")
+    monkeypatch.setenv("MCQS_FSS_RESULTS_DIR", str(tmp_path))
+    result = _result()
+
+    uri = write_result(result)
+
+    partial = tmp_path / "runs" / "test-run" / "partials" / "part-00000.json"
+    assert uri == f"fss://{partial}"
+    assert json.loads(partial.read_text(encoding="utf-8"))["run_id"] == "test-run"
+    assert not list(partial.parent.glob("*.tmp"))
+
+
+def test_write_result_fss_rejects_different_immutable_retry(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.setenv("MCQS_RESULT_DELIVERY_MODE", "fss")
+    monkeypatch.setenv("MCQS_FSS_RESULTS_DIR", str(tmp_path))
+    write_result(_result())
+    changed = _result()
+    changed["input_sha256"] = "b" * 64
+
+    with pytest.raises(RuntimeError, match="already exists with different partition content"):
+        write_result(changed)
+
+
+def test_write_result_rejects_unknown_result_delivery_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MCQS_RESULT_DELIVERY_MODE", "unsupported")
+
+    with pytest.raises(ValueError, match="object_storage or fss"):
+        write_result(_result())

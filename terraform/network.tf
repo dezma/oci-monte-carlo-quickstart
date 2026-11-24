@@ -155,6 +155,19 @@ resource "oci_core_subnet" "service_lb" {
   freeform_tags              = local.tags
 }
 
+resource "oci_core_subnet" "fss" {
+  count                      = local.fss_enabled ? 1 : 0
+  compartment_id             = var.compartment_ocid
+  vcn_id                     = oci_core_vcn.this.id
+  cidr_block                 = var.fss_subnet_cidr
+  display_name               = "${var.name_prefix}-fss-private"
+  dns_label                  = "fss"
+  route_table_id             = oci_core_route_table.private.id
+  security_list_ids          = [oci_core_security_list.private_baseline.id]
+  prohibit_public_ip_on_vnic = true
+  freeform_tags              = local.tags
+}
+
 resource "oci_core_network_security_group" "oke_internal" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.this.id

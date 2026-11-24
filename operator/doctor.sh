@@ -53,4 +53,22 @@ mcqs_note "Checking private OKE connectivity"
 mcqs_configure_kubeconfig
 kubectl cluster-info
 
+if [[ "${MCQS_RESULT_DELIVERY_MODE:-fss}" == "fss" ]]; then
+  mcqs_note "Checking private FSS result delivery"
+  MCQS_FSS_RESULTS_DIR="${MCQS_FSS_RESULTS_DIR:-}"
+  mcqs_require_value MCQS_FSS_RESULTS_DIR
+  mountpoint -q "$MCQS_FSS_RESULTS_DIR" || \
+    mcqs_fail "FSS results are not mounted at ${MCQS_FSS_RESULTS_DIR}. Review /var/log/mcqs-operator-bootstrap.log."
+  kubectl get csidriver fss.csi.oraclecloud.com >/dev/null || \
+    mcqs_fail "The OKE FSS CSI driver is unavailable. Enable or repair the OKE File Storage CSI add-on."
+  printf 'FSS results: mounted at %s\n' "$MCQS_FSS_RESULTS_DIR"
+  if kubectl -n "$MCQS_NAMESPACE" get pvc "${MCQS_FSS_PERSISTENT_VOLUME_CLAIM_NAME:-}" >/dev/null 2>&1; then
+    [[ "$(kubectl -n "$MCQS_NAMESPACE" get pvc "$MCQS_FSS_PERSISTENT_VOLUME_CLAIM_NAME" -o jsonpath='{.status.phase}')" == "Bound" ]] || \
+      mcqs_fail "FSS runtime claim ${MCQS_FSS_PERSISTENT_VOLUME_CLAIM_NAME} is not Bound. Run operator/install-runtime.sh and check the FSS CSI driver."
+    printf 'FSS runtime claim: %s (Bound)\n' "$MCQS_FSS_PERSISTENT_VOLUME_CLAIM_NAME"
+  else
+    printf 'FSS runtime claim: not installed yet; run operator/install-runtime.sh\n'
+  fi
+fi
+
 printf '\nOperator is ready. Next run operator/install-runtime.sh, publish an immutable image, create the pull secret, and submit a job.\n'

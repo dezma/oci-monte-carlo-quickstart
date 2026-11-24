@@ -26,6 +26,7 @@ spec:
       app.kubernetes.io/component: simulator
   policyTypes:
     - Egress
+    {{- if eq (include "monte-carlo.resultDeliveryMode" .) "object_storage" }}
   egress:
     - ports:
         - protocol: UDP
@@ -35,4 +36,7 @@ spec:
     - ports:
         - protocol: TCP
           port: 443
+    {{- else }}
+  egress: []
+    {{- end }}
 {{- end }}

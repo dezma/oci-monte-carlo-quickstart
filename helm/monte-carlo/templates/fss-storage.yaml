@@ -1,0 +1,43 @@
+{{- $mode := include "monte-carlo.resultDeliveryMode" . }}
+{{- if and (not .Values.run.enabled) (eq $mode "fss") }}
+{{- $volumeHandle := required "resultDelivery.fss.volumeHandle is required when resultDelivery.mode is fss" .Values.resultDelivery.fss.volumeHandle }}
+{{- $persistentVolumeName := required "resultDelivery.fss.persistentVolumeName is required when resultDelivery.mode is fss" .Values.resultDelivery.fss.persistentVolumeName }}
+{{- $claimName := required "resultDelivery.fss.claimName is required when resultDelivery.mode is fss" .Values.resultDelivery.fss.claimName }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $persistentVolumeName }}
+  labels:
+    {{- include "monte-carlo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: result-storage
+spec:
+  capacity:
+    # Kubernetes requires a capacity even though OCI File Storage is elastic
+    # and does not impose this value as a physical size limit.
+    storage: {{ .Values.resultDelivery.fss.capacity | quote }}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  csi:
+    driver: fss.csi.oraclecloud.com
+    volumeHandle: {{ $volumeHandle | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $claimName }}
+  namespace: {{ include "monte-carlo.namespace" . }}
+  labels:
+    {{- include "monte-carlo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: result-storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.resultDelivery.fss.capacity | quote }}
+  storageClassName: ""
+  volumeName: {{ $persistentVolumeName | quote }}
+{{- end }}

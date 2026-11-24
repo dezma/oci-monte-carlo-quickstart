@@ -27,18 +27,22 @@ resource "terraform_data" "operator_image" {
   }
 }
 
+resource "terraform_data" "operator_bootstrap_generation" {
+  input = var.operator_bootstrap_generation
+}
+
 resource "oci_bastion_bastion" "operator" {
   bastion_type                 = "STANDARD"
   compartment_id               = var.compartment_ocid
   target_subnet_id             = oci_core_subnet.bastion.id
   name                         = "${var.name_prefix}-operator-bastion"
   client_cidr_block_allow_list = [var.bastion_client_cidr]
-  max_session_ttl_in_seconds   = 3600
+  max_session_ttl_in_seconds   = var.bastion_session_ttl_seconds
   freeform_tags                = local.tags
 }
 
 resource "oci_core_instance" "operator" {
-  availability_domain = local.availability_domain
+  availability_domain = local.operator_availability_domain
   compartment_id      = var.compartment_ocid
   display_name        = "${var.name_prefix}-operator"
   shape               = local.operator_shape
@@ -84,11 +88,28 @@ resource "oci_core_instance" "operator" {
       object_storage_prefix = var.object_storage_prefix
       service_account_name  = var.service_account_name
       kubernetes_namespace  = var.kubernetes_namespace
+      kubernetes_access_mode = local.operator_kubernetes_access_mode
+      result_delivery_mode  = local.result_delivery_mode
+      fss_enabled           = local.fss_enabled
+      fss_mount_target_ip   = local.fss_mount_target_ip
+      fss_export_path       = var.fss_export_path
+      fss_operator_mount_path = var.fss_operator_mount_path
+      fss_volume_handle     = local.fss_volume_handle
+      fss_persistent_volume_name = local.fss_persistent_volume_name
+      fss_persistent_volume_claim_name = local.fss_persistent_volume_claim_name
+      fss_persistent_volume_capacity = var.fss_persistent_volume_capacity
+      benchmark_node_pool_profiles_b64 = base64encode(local.benchmark_node_pool_profiles_json)
     }))
   }
 
   depends_on = [
     terraform_data.operator_image,
+    terraform_data.operator_identity_configuration,
     oci_objectstorage_object.operator_bundle,
+    oci_file_storage_export.results,
   ]
+
+  lifecycle {
+    replace_triggered_by = [terraform_data.operator_bootstrap_generation]
+  }
 }
