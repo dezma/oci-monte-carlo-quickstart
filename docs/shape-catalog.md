@@ -17,7 +17,7 @@ The Terraform node pool accepts any OKE-supported fixed or flexible shape return
 | Processor family | Flexible VM shapes | Fixed/bare-metal examples | Monte Carlo use |
 |---|---|---|---|
 | Intel | `VM.Standard3.Flex`, `VM.Standard4.Ax.Flex`, `VM.Optimized3.Flex` | `BM.Standard3.64`, `BM.Standard4.Ax.120`, `BM.Optimized3.36` | General compute, high-frequency optimized work, or Intel Acceleron testing. |
-| AMD | `VM.Standard.E4.Flex`, `VM.Standard.E5.Flex`, `VM.Standard.E6.Flex`, `VM.Standard.E6.Ax.Flex` | `BM.Standard.E4.128`, `BM.Standard.E5.192`, `BM.Standard.E6.256`, `BM.Standard.E6.Ax.192` | Default x86 path; use E6/E6.Ax for current-generation price/performance testing. |
+| AMD | `VM.Standard.E4.Flex`, `VM.Standard.E5.Flex`, `VM.Standard.E6.Flex`, `VM.Standard.E6.Ax.Flex` | `BM.Standard.E4.128`, `BM.Standard.E5.192`, `BM.Standard.E6.256`, `BM.Standard.E6.Ax.192` | Default x86 path; use E6 and E6.Ax variants for managed-node comparisons. |
 | AMD DenseIO | `VM.DenseIO.E4.Flex`, `VM.DenseIO.E5.Flex`, `VM.DenseIO.E6.Ax.Flex` | `BM.DenseIO.E4.128`, `BM.DenseIO.E5.128`, `BM.DenseIO.E6.Ax.192` | Only when local NVMe materially helps data ingestion or result staging. |
 | AMD HPC | — | `BM.HPC.E5.144` | High-throughput, tightly coupled HPC experiments; validate OKE capacity and cost first. |
 | Ampere Arm | `VM.Standard.A1.Flex`, `VM.Standard.A2.Flex`, `VM.Standard.A4.Flex`, `VM.Standard.A4.Ax.Flex` | `BM.Standard.A1.160`, `BM.Standard.A4.48`, `BM.Standard.A4.Ax.48` | High-density Arm workers; use `--architecture arm64`. |
@@ -44,16 +44,18 @@ The discovery script reports VM, bare metal, DenseIO, HPC/optimized, and GPU sha
 | Profile | Shape | Architecture | Intended use |
 |---|---|---|---|
 | `starter-amd.tfvars` | `VM.Standard.E6.Flex` | `amd64` | Lowest-risk x86 onboarding path. |
+| `amd-e5.tfvars` | `VM.Standard.E5.Flex` | `amd64` | AMD E5 comparison path. |
 | `amd-acceleron.tfvars` | `VM.Standard.E6.Ax.Flex` | `amd64` | Current AMD Acceleron benchmark path. |
+| `intel-optimized3.tfvars` | `VM.Optimized3.Flex` | `amd64` | Intel optimized-compute comparison path. |
 | `intel-acceleron.tfvars` | `VM.Standard4.Ax.Flex` | `amd64` | Current Intel/X12 Acceleron benchmark path. |
 | `arm-acceleron.tfvars` | `VM.Standard.A4.Ax.Flex` | `arm64` | Current Ampere A4 Acceleron benchmark path. |
 | `hpc-amd.tfvars` | `BM.HPC.E5.144` | `amd64` | Controlled high-scale exercise only. |
 
-The current flexible-shape documentation lists OCPU/memory ranges. Do not assume a requested configuration is available: capacity and permissible shape configurations are validated during the OCI apply.
+The current flexible-shape documentation lists OCPU/memory ranges. Do not assume a requested configuration is available: capacity and permissible shape configurations are validated during the OCI apply. For managed nodes, OKE's node-pool options are the deployment gate. A shape absent from that response must not be configured as a managed node pool, even when it appears in the Compute shape list.
 
 ## Architecture selection at run time
 
-Architecture is a required part of the live OKE selection, not an assumption made after provisioning. After selecting a live shape and OKE version, run `provisioning/list-oke-options.sh` with `--node-shape`, `--architecture`, and `--kubernetes-version`, then choose a node image returned for that exact architecture. `v1.36.1` is the prefilled recommended full version, but retain it only when the live OKE query reports that exact patch.
+Architecture is a required part of the live OKE selection, not an assumption made after provisioning. After selecting a live shape and OKE version, run `provisioning/list-oke-options.sh` with `--node-shape`, `--architecture`, and `--kubernetes-version`, then choose a node image returned for that exact architecture. Select a full patch version from the live OKE response; do not rely on a static project default.
 
 The default image path is a native build for the selected node architecture. Match the Job selector to that same architecture:
 
@@ -64,3 +66,5 @@ The default image path is a native build for the selected node architecture. Mat
 ```
 
 Use `amd64` for Intel and AMD shapes and `arm64` for Ampere shapes. The chart never mixes architectures inside one run; benchmark each family using the same input, seed, parallelism, and engine digest. For a deliberately portable image, use `./operator/build-and-push.sh --multi-arch` only when the Buildx builder can publish both variants to OCIR. Both paths resolve an immutable digest; the runtime never deploys a mutable tag.
+
+For the repeatable insurance-savings comparison commands, pool-label pattern, and throughput interpretation, see [Shape benchmarking](shape-benchmarking.md).

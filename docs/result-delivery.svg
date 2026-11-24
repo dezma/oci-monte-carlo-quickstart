@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="832" viewBox="0 0 1440 832" role="img" aria-labelledby="title desc">
+<title id="title">How a partition becomes a result</title><desc id="desc">In FSS mode, the CSI mount on each worker and the operator NFS mount expose the same export at different paths. In Object Storage mode, a worker instead uses an authenticated API call and the reducer lists and reads objects.</desc>
+<defs>
+<style>text{font-family:"DejaVu Sans",Arial,sans-serif}.top{fill:#fff;font-size:32px;font-weight:bold}.over{fill:#ffd6bf;font-size:14px;font-weight:bold;letter-spacing:1.5px}.sub{fill:#f1e7dd;font-size:17px}.key{fill:#605347;font-size:13px;font-weight:bold;letter-spacing:1px}.h{fill:#28231f;font-size:21px;font-weight:bold}.body{fill:#302d29;font-size:16px}.label{fill:#31634e;font-size:15px;font-weight:bold}.minor{fill:#5c5651;font-size:15px}.link{fill:none;stroke-width:3;stroke-linejoin:round}.control{stroke:#785348}.data{stroke:#287151}.alt{stroke:#477080;stroke-dasharray:8 5}</style>
+<marker id="control" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#785348"/></marker>
+<marker id="data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#287151"/></marker>
+<marker id="alt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#477080"/></marker>
+</defs>
+<rect width="1440" height="832" fill="#f8f5f0"/><rect width="1440" height="114" fill="#332b26"/><rect width="9" height="114" fill="#c74634"/>
+<text x="40" y="29" class="over">OCI  /  MONTE CARLO QUICKSTART                              DATA PATH   02</text>
+<text x="40" y="70" class="top">How a partition becomes a result</text>
+<text x="40" y="99" class="sub">One run ID, one input hash, one partial per partition. Select one result backend per environment.</text>
+<text x="40" y="153" class="key">A   /   FILE STORAGE (FSS) — DEFAULT</text>
+<text x="40" y="185" class="h">Two mount paths, one shared file system</text>
+<rect x="36" y="215" width="402" height="186" rx="12" fill="#e9f3ec" stroke="#478469" stroke-width="1.5" />
+<text x="54" y="242" class="key">WRITE   /   SIMULATOR POD</text>
+<text x="54" y="273" class="h">/results</text>
+<text x="54" y="301" class="body">Indexed workers publish non-root.</text>
+<text x="54" y="323" class="body">A baseline ReadWriteMany claim binds</text>
+<text x="54" y="345" class="body">to a static PV; the node CSI driver</text>
+<text x="54" y="367" class="body">mounts the export for each Pod.</text>
+<rect x="514" y="215" width="412" height="186" rx="12" fill="#e9f3ec" stroke="#478469" stroke-width="1.5" />
+<text x="532" y="242" class="key">STORE   /   PRIVATE MOUNT TARGET</text>
+<text x="532" y="273" class="h">/monte-carlo-results</text>
+<text x="532" y="301" class="body">NFS export · worker UID/GID 10001</text>
+<text x="532" y="323" class="body">runs/&lt;run-id&gt;/partials/part-00000.json</text>
+<text x="532" y="345" class="body">Each index publishes its own file without</text>
+<text x="532" y="367" class="body">overwriting a completed partial.</text>
+<rect x="1002" y="215" width="402" height="186" rx="12" fill="#e9f3ec" stroke="#478469" stroke-width="1.5" />
+<text x="1020" y="242" class="key">READ   /   PRIVATE OPERATOR</text>
+<text x="1020" y="273" class="h">/mnt/mcqs-results</text>
+<text x="1020" y="301" class="body">The reducer reads the same run directory.</text>
+<text x="1020" y="323" class="body">It checks the input hash and partition set</text>
+<text x="1020" y="345" class="body">before aggregating. No copy from the</text>
+<text x="1020" y="367" class="body">worker nodes is needed.</text>
+<path class="link data" d="M440 306H510" marker-end="url(#data)"/>
+<path class="link data" d="M928 306H998" marker-end="url(#data)"/>
+<rect x="36" y="420" width="1368" height="65" rx="12" fill="#e9f3ec" stroke="#99b9a6" stroke-width="1.5" />
+<text x="54" y="447" class="label">Before a benchmark</text>
+<text x="245" y="447" class="body">A Bound PVC confirms a binding, not a successful NFS mount. The worker probe writes and removes a test file on two eligible hosts.</text>
+<text x="245" y="471" class="minor">The probe is outside the timed run. Simulation Pods do not need an OCI result-write token or pod-level NFS egress.</text>
+<text x="40" y="532" class="key">B   /   OBJECT STORAGE — ALTERNATIVE</text>
+<text x="40" y="564" class="h">Same partitions, different publication and access controls</text>
+<rect x="36" y="590" width="402" height="143" rx="12" fill="#edf4f6" stroke="#58808e" stroke-width="1.5" />
+<text x="54" y="617" class="key">WRITE   /   SIMULATOR POD</text>
+<text x="54" y="648" class="h">OKE Workload Identity</text>
+<text x="54" y="676" class="body">PutObject with a no-overwrite condition</text>
+<text x="54" y="698" class="body">under the configured result prefix.</text>
+<rect x="514" y="590" width="412" height="143" rx="12" fill="#edf4f6" stroke="#58808e" stroke-width="1.5" />
+<text x="532" y="617" class="key">STORE   /   PRIVATE BUCKET</text>
+<text x="532" y="648" class="h">Run-scoped objects</text>
+<text x="532" y="676" class="body">&lt;prefix&gt;/runs/&lt;run-id&gt;/partials/</text>
+<text x="532" y="698" class="body">Bootstrap objects use a separate prefix.</text>
+<rect x="1002" y="590" width="402" height="143" rx="12" fill="#edf4f6" stroke="#58808e" stroke-width="1.5" />
+<text x="1020" y="617" class="key">READ   /   PRIVATE OPERATOR</text>
+<text x="1020" y="648" class="h">Instance principal</text>
+<text x="1020" y="676" class="body">The reducer lists and reads run objects.</text>
+<text x="1020" y="698" class="body">No FSS volume is mounted in this mode.</text>
+<path class="link alt" d="M440 660H510" marker-end="url(#alt)"/>
+<path class="link alt" d="M928 660H998" marker-end="url(#alt)"/>
+<text x="40" y="779" class="body">In both modes, the operator downloads its bootstrap bundle from Object Storage. Results are not automatically copied between backends.</text>
+<text x="40" y="806" class="minor">Benchmark suite JSON and CSV reports are separate files on the operator VM; export them before replacing the VM.</text>
+</svg>

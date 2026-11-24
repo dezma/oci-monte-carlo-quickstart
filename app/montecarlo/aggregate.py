@@ -5,10 +5,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from math import sqrt
+from pathlib import Path
 from typing import Any
 
 Z_SCORES = {0.90: 1.6448536269, 0.95: 1.9599639845, 0.99: 2.5758293035}
+RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
 def _positive_integer(value: str) -> int:
@@ -193,13 +196,56 @@ def fetch_partials(bucket: str, namespace: str, prefix: str) -> list[dict[str, A
     return partials
 
 
+def fetch_filesystem_partials(results_dir: str, run_id: str) -> list[dict[str, Any]]:
+    """Read one completed run from the mounted OCI File Storage export."""
+    if not RUN_ID_PATTERN.fullmatch(run_id):
+        raise ValueError("run_id is unsafe for an FSS result path")
+    root = Path(results_dir).resolve(strict=True)
+    partial_directory = root / "runs" / run_id / "partials"
+    resolved_directory = partial_directory.resolve(strict=True)
+    if root not in resolved_directory.parents:
+        raise ValueError("FSS partial-result directory is outside results-dir")
+    if not resolved_directory.is_dir():
+        raise ValueError("FSS partial-result path is not a directory")
+
+    partials: list[dict[str, Any]] = []
+    for partial_path in sorted(resolved_directory.glob("part-*.json")):
+        resolved_path = partial_path.resolve(strict=True)
+        if resolved_path.parent != resolved_directory or not resolved_path.is_file():
+            raise ValueError(f"unsafe FSS partial-result file: {partial_path}")
+        try:
+            partials.append(json.loads(resolved_path.read_text(encoding="utf-8")))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"could not read FSS partial-result file: {partial_path}") from error
+    return partials
+
+
+def add_result_source_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add mutually exclusive Object Storage and FSS aggregation arguments."""
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--bucket", help="Object Storage bucket containing partial results")
+    source.add_argument("--results-dir", help="Mounted FSS results directory")
+    parser.add_argument("--namespace", help="Object Storage namespace")
+    parser.add_argument("--prefix", help="Object Storage prefix containing partial results")
+    parser.add_argument("--run-id", help="Run identifier when reading FSS partial results")
+
+
+def fetch_partials_from_arguments(arguments: argparse.Namespace) -> list[dict[str, Any]]:
+    """Validate the selected result source and load its immutable partials."""
+    if arguments.results_dir:
+        if not arguments.run_id:
+            raise ValueError("--run-id is required with --results-dir")
+        return fetch_filesystem_partials(arguments.results_dir, arguments.run_id)
+    if not arguments.namespace or not arguments.prefix:
+        raise ValueError("--namespace and --prefix are required with --bucket")
+    return fetch_partials(arguments.bucket, arguments.namespace, arguments.prefix)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Aggregate Monte Carlo partial results from OCI Object Storage."
+        description="Aggregate immutable Monte Carlo partial results from Object Storage or FSS."
     )
-    parser.add_argument("--bucket", required=True)
-    parser.add_argument("--namespace", required=True)
-    parser.add_argument("--prefix", required=True)
+    add_result_source_arguments(parser)
     parser.add_argument("--confidence", type=float, default=0.95)
     parser.add_argument(
         "--expected-partitions",
@@ -208,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     arguments = parser.parse_args(argv)
     summary = aggregate(
-        fetch_partials(arguments.bucket, arguments.namespace, arguments.prefix),
+        fetch_partials_from_arguments(arguments),
         arguments.confidence,
         expected_partitions=arguments.expected_partitions,
     )

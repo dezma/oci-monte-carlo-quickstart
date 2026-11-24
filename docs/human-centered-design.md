@@ -25,11 +25,12 @@ An onboarding session is successful when a user can, in one guided session:
 - select a verified available shape;
 - select a live-supported full Kubernetes patch, compatible node image, and the corresponding `amd64` or `arm64` architecture;
 - deploy an isolated private environment;
-- pass the private operator bootstrap and doctor check;
+- pass the private operator doctor check and identify the default FSS mount;
 - install the shared baseline and publish a native digest-addressed image;
 - create or rotate the separate OCIR pull secret;
 - run the synthetic sample with a chosen parallelism and matching architecture;
-- see a price, confidence interval, input hash, and runtime metadata; and
+- find the worker partials under the run ID and distinguish them from operator-local benchmark reports;
+- see a price or net liability estimate, confidence interval, input hash and runtime metadata; and
 - understand how to stop jobs and remove infrastructure.
 
 Multi-architecture publishing is an optional advanced path for an environment that needs both CPU architectures; it is not a prerequisite for a first native run.

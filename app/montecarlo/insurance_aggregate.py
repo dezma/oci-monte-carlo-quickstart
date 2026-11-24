@@ -7,7 +7,13 @@ import json
 from math import sqrt
 from typing import Any
 
-from .aggregate import _positive_integer, _validate_expected_partitions, _z_score, fetch_partials
+from .aggregate import (
+    _positive_integer,
+    _validate_expected_partitions,
+    _z_score,
+    add_result_source_arguments,
+    fetch_partials_from_arguments,
+)
 
 
 def _number(item: dict[str, Any], key: str, partial_number: int) -> float:
@@ -112,11 +118,9 @@ def aggregate_insurance_savings(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Aggregate synthetic insurance-savings partial results from OCI Object Storage."
+        description="Aggregate synthetic insurance-savings partial results from Object Storage or FSS."
     )
-    parser.add_argument("--bucket", required=True)
-    parser.add_argument("--namespace", required=True)
-    parser.add_argument("--prefix", required=True)
+    add_result_source_arguments(parser)
     parser.add_argument("--confidence", type=float, default=0.95)
     parser.add_argument(
         "--expected-partitions",
@@ -125,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     arguments = parser.parse_args(argv)
     summary = aggregate_insurance_savings(
-        fetch_partials(arguments.bucket, arguments.namespace, arguments.prefix),
+        fetch_partials_from_arguments(arguments),
         arguments.confidence,
         expected_partitions=arguments.expected_partitions,
     )

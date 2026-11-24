@@ -5,19 +5,36 @@ region           = "us-ashburn-1"
 
 name_prefix = "mcqs"
 
+# Worker-node placement can be chosen for shape capacity without moving the
+# Bastion-reached operator VM or, when enabled, File Storage. The stack retains
+# their initial placement when these optional values are left empty. Values are
+# OCI Availability Domain names returned by provisioning/list-shapes.sh.
+# availability_domain          = "<worker-ad>"
+# operator_availability_domain = "<operator-ad>"
+# fss_availability_domain      = "<fss-ad>"
+
 # Terraform creates a private operator workstation and an OCI Bastion service.
 # The operator subnet is the sole CIDR permitted to reach the private OKE API.
 operator_subnet_cidr = "10.42.48.0/28"
 bastion_subnet_cidr  = "10.42.49.0/28"
+# Used only with result_delivery_mode = "fss". Keep it separate from the
+# worker and operator subnets; an FSS mount target requires several free IPs.
+fss_subnet_cidr = "10.42.50.0/28"
+# fss_mount_target_ip = "10.42.50.10"
 
 # Required: public client range permitted to create an OCI Bastion session.
 # This is your corporate VPN or workstation public address—not a Cloud Shell CIDR.
 bastion_client_cidr = "203.0.113.25/32"
 
-# Required in Resource Manager: select a supported Kubernetes minor or exact patch
-# and a compatible node image before provisioning. This must be a full OKE patch
-# version listed by ../provisioning/list-oke-options.sh.
-kubernetes_version = "v1.36.1"
+# OCI Bastion accepts sessions from 30 minutes through 3 hours. The default is
+# the maximum 3-hour value. The generated session commands use this setting.
+bastion_session_ttl_seconds = 10800
+# bastion_ssh_public_key_file = "$HOME/.ssh/id_rsa.pub"
+
+# Required in Resource Manager: select a supported full patch version and a
+# compatible node image before provisioning. Use a version listed by
+# ../provisioning/list-oke-options.sh; minor-only values such as v1.36 are invalid.
+kubernetes_version = "<full-version-returned-by-list-oke-options>"
 node_image_id      = "ocid1.image.oc1..replace-me"
 
 # Explicitly match the architecture of node_image_id. Do not infer architecture
@@ -31,6 +48,54 @@ node_shape_ocpus      = 2
 node_shape_memory_gbs = 16
 node_pool_size         = 2
 max_pods_per_node      = 31
+
+# Optional: choose the dedicated benchmark pools to create. Every selected
+# profile receives a persistent benchmark label and is targeted automatically
+# by operator/run-benchmark.sh. All selected profiles use the shared capacity
+# values below, keeping the comparison controlled and easy to reproduce.
+# enable_benchmark_e5_flex       = true
+# enable_benchmark_e6_flex       = true
+# enable_benchmark_e6_acceleron  = true
+# enable_benchmark_intel_optimized3 = true
+# enable_benchmark_intel_acceleron = true
+# enable_benchmark_a4_acceleron  = true
+
+# The primary node_image_id is automatically reused for selected profiles of
+# the same architecture. Set the matching value below only when testing the
+# other architecture. Each image must match kubernetes_version exactly.
+# benchmark_amd64_node_image_id = "ocid1.image.oc1..replace-with-amd64-image"
+# benchmark_arm64_node_image_id = "ocid1.image.oc1..replace-with-arm64-image"
+
+benchmark_pool_ocpus             = 4
+benchmark_pool_memory_gbs        = 32
+benchmark_pool_initial_size      = 2
+benchmark_pool_min_size          = 2
+benchmark_pool_max_size          = 4
+benchmark_pool_max_pods_per_node = 31
+
+# Optional: enable OKE Cluster Autoscaler for only the selected benchmark
+# pools. It enforces benchmark_pool_min_size and benchmark_pool_max_size. The
+# primary worker pool remains available for OKE system components.
+# enable_benchmark_cluster_autoscaler = true
+# create_benchmark_cluster_autoscaler_workload_identity_policy = true
+# benchmark_cluster_autoscaler_remove_resources_on_destroy = true
+
+# Advanced Terraform CLI only: define an additional custom profile not offered
+# by the guided controls above. This is deliberately not displayed in Resource
+# Manager; use the documented guided profile selections for the common path.
+# benchmark_node_pools_json = jsonencode({
+#   "custom-amd64" = {
+#     node_shape        = "VM.Standard.E6.Flex"
+#     node_image_id     = "ocid1.image.oc1..replace-with-amd64-image"
+#     architecture      = "amd64"
+#     ocpus             = 4
+#     memory_in_gbs     = 32
+#     initial_size      = 1
+#     min_size          = 1
+#     max_size          = 4
+#     max_pods_per_node = 31
+#   }
+# })
 
 # For fixed shapes, set both values to null:
 # node_shape = "BM.HPC.E5.144"
@@ -51,6 +116,33 @@ operator_boot_volume_gbs  = 50
 
 # The workload identity can only create result objects below this prefix.
 object_storage_prefix = "monte-carlo"
+
+# The default writes immutable partials to a private OCI File Storage export
+# shared by OKE workers and the operator. Pods receive no Object Storage
+# workload-identity token. Set object_storage only when that delivery path is
+# preferred by the platform design.
+result_delivery_mode = "fss"
+# fss_export_path = "/monte-carlo-results"
+# fss_operator_mount_path = "/mnt/mcqs-results"
+# fss_persistent_volume_capacity = "50Gi"
+
+# Each IAM resource is independently selectable. Set a flag to false when the
+# matching policy is managed outside this stack. Terraform does not inspect
+# externally managed policies.
+# create_workload_object_storage_policy = false
+# create_operator_dynamic_group = false
+# operator_dynamic_group_ocid = "ocid1.dynamicgroup.oc1..replace-me"
+# create_operator_cluster_access_policy = false
+# create_operator_bootstrap_bundle_read_policy = false
+# create_operator_results_read_policy = false
+
+# iam_admin is the smooth quickstart path. namespace_rbac requires an
+# administrator to apply the generated namespace RoleBinding output once.
+operator_kubernetes_access_mode = "iam_admin"
+
+# Increase only to deliberately replace the operator instance after a runtime
+# bundle or benchmark-profile update.
+operator_bootstrap_generation = 1
 
 # Optional: override the derived <region-key>.ocir.io registry domain for a
 # realm-specific endpoint. Do not include https:// or a repository path.

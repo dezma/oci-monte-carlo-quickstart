@@ -1,14 +1,15 @@
 schemaVersion: 1.1.0
 locale: en
 variableGroups:
-  - title: Required configuration
+  - title: Deployment location
     variables:
       - tenancy_ocid
       - compartment_ocid
       - region
-  - title: Network and access
-    variables:
       - name_prefix
+      - availability_domain
+  - title: Private network and Bastion access
+    variables:
       - vcn_cidr
       - api_subnet_cidr
       - worker_subnet_cidr
@@ -17,31 +18,75 @@ variableGroups:
       - operator_subnet_cidr
       - bastion_subnet_cidr
       - bastion_client_cidr
-  - title: Compute and Kubernetes
+      - bastion_session_ttl_seconds
+      - bastion_ssh_public_key_file
+  - title: OKE cluster and primary workers
     variables:
-      - availability_domain
       - kubernetes_version
       - node_architecture
       - node_shape
+      - node_image_id
       - node_shape_ocpus
       - node_shape_memory_gbs
       - node_pool_size
       - max_pods_per_node
-      - node_image_id
+  - title: Results and workload security
+    variables:
+      - kubernetes_namespace
+      - service_account_name
+      - result_delivery_mode
+      - object_storage_bucket_name
+      - object_storage_prefix
+      - create_workload_object_storage_policy
+      - fss_subnet_cidr
+      - fss_availability_domain
+      - fss_mount_target_ip
+      - fss_export_path
+      - fss_operator_mount_path
+      - fss_persistent_volume_capacity
+  - title: Benchmark profiles — select Compute shapes
+    variables:
+      - enable_benchmark_e5_flex
+      - enable_benchmark_e6_flex
+      - enable_benchmark_e6_acceleron
+      - enable_benchmark_intel_optimized3
+      - enable_benchmark_intel_acceleron
+      - enable_benchmark_a4_acceleron
+  - title: Benchmark profiles — images and capacity
+    variables:
+      - benchmark_amd64_node_image_id
+      - benchmark_arm64_node_image_id
+      - benchmark_pool_ocpus
+      - benchmark_pool_memory_gbs
+      - benchmark_pool_initial_size
+      - benchmark_pool_min_size
+      - benchmark_pool_max_size
+      - benchmark_pool_max_pods_per_node
+  - title: Benchmark profiles — elastic capacity (optional)
+    variables:
+      - enable_benchmark_cluster_autoscaler
+      - create_benchmark_cluster_autoscaler_workload_identity_policy
+      - benchmark_cluster_autoscaler_remove_resources_on_destroy
   - title: Private operator workstation
     variables:
+      - operator_availability_domain
       - operator_shape
       - operator_shape_ocpus
       - operator_shape_memory_gbs
       - operator_boot_volume_gbs
       - operator_image_id
       - operator_helm_version
-  - title: Workload security
+      - operator_kubernetes_access_mode
+      - operator_bootstrap_generation
+  - title: Operator identity and permissions
     variables:
-      - kubernetes_namespace
-      - service_account_name
-      - object_storage_bucket_name
-      - object_storage_prefix
+      - create_operator_dynamic_group
+      - operator_dynamic_group_ocid
+      - create_operator_cluster_access_policy
+      - create_operator_bootstrap_bundle_read_policy
+      - create_operator_results_read_policy
+  - title: Advanced deployment settings
+    variables:
       - ocir_registry
       - kms_key_id
       - freeform_tags
@@ -83,6 +128,17 @@ variables:
     type: string
     default: 10.42.32.0/24
     required: true
+  fss_subnet_cidr:
+    type: string
+    title: FSS mount-target subnet CIDR
+    description: Dedicated private subnet for the OCI File Storage mount target when result delivery uses FSS. It must not overlap another quickstart subnet and should be /28 or larger.
+    default: 10.42.50.0/28
+    required: false
+  fss_mount_target_ip:
+    type: string
+    title: FSS mount-target private IP
+    description: Optional fixed address in the FSS subnet. Leave empty to use host address 10 in the selected FSS subnet.
+    required: false
   operator_subnet_cidr:
     type: string
     title: Private operator subnet CIDR
@@ -100,15 +156,37 @@ variables:
     title: Bastion client CIDR
     description: Required public workstation or corporate VPN CIDR permitted to create Bastion sessions; for one workstation use its public IPv4 address with /32.
     required: true
+  bastion_session_ttl_seconds:
+    type: number
+    title: Bastion session lifetime (seconds)
+    description: Maximum lifetime for generated Bastion sessions. OCI Bastion permits 1,800 to 10,800 seconds; the default is 10,800 seconds (three hours).
+    default: 10800
+    required: true
+  bastion_ssh_public_key_file:
+    type: string
+    title: Bastion SSH public-key file
+    description: Public-key path placed in generated Bastion CLI commands. Terraform does not read the file; change it if your workstation uses another RSA key.
+    default: $HOME/.ssh/id_rsa.pub
+    required: true
   availability_domain:
     type: string
-    title: Availability Domain
+    title: Worker Availability Domain
+    description: Optional. Sets placement for primary and benchmark OKE worker pools. Leave empty to use the first Availability Domain returned by OCI; set a specific domain when worker-shape capacity requires it.
+    required: false
+  operator_availability_domain:
+    type: string
+    title: Operator Availability Domain
+    description: Optional. Leave empty to retain the initial operator placement if worker pools move later for capacity.
+    required: false
+  fss_availability_domain:
+    type: string
+    title: File Storage Availability Domain
+    description: Optional. Used only with FSS result delivery. Leave empty to retain the initial File Storage placement if worker pools move later for capacity.
     required: false
   kubernetes_version:
     type: string
     title: Kubernetes version
-    description: Required. Defaults to the v1.36.1 OKE patch release. Select a full version returned by provisioning/list-oke-options.sh before creating the stack; minor-only values such as v1.36 are not valid.
-    default: v1.36.1
+    description: Required. Select a full version returned by provisioning/list-oke-options.sh before creating the stack; minor-only values such as v1.36 are not valid.
     required: true
   node_architecture:
     type: string
@@ -124,24 +202,132 @@ variables:
     required: true
   node_shape_ocpus:
     type: number
+    title: OCPUs per primary worker
+    description: Used for Flex shapes. Leave the default only when it meets the expected simulation concurrency; fixed shapes ignore this field.
     default: 2
     required: false
   node_shape_memory_gbs:
     type: number
+    title: Memory (GB) per primary worker
+    description: Used for Flex shapes. Size memory for the model, simulation paths, and concurrent worker Pods; fixed shapes ignore this field.
     default: 16
     required: false
   node_pool_size:
     type: number
+    title: Initial primary-worker nodes
+    description: Baseline OKE capacity for platform services and workloads that are not scheduled to a dedicated benchmark pool.
     default: 2
     required: true
   max_pods_per_node:
     type: number
+    title: Maximum Pods per primary worker
+    description: VCN-native Pod limit for primary workers. Confirm it is within the selected shape's VNIC capacity.
     default: 31
     required: true
   node_image_id:
     type: string
     title: OKE node image OCID
     description: Required. Select an image OCID compatible with the chosen Kubernetes version and node architecture using provisioning/list-oke-options.sh.
+    required: true
+  enable_benchmark_e6_flex:
+    type: boolean
+    title: Add AMD E6 Flex pool
+    description: Creates a dedicated amd64 benchmark pool using VM.Standard.E6.Flex.
+    default: false
+    required: true
+  enable_benchmark_e5_flex:
+    type: boolean
+    title: Add AMD E5 Flex pool
+    description: Creates a dedicated amd64 benchmark pool using VM.Standard.E5.Flex.
+    default: false
+    required: true
+  enable_benchmark_e6_acceleron:
+    type: boolean
+    title: Add AMD E6 Acceleron pool
+    description: Creates a dedicated amd64 benchmark pool using VM.Standard.E6.Ax.Flex.
+    default: false
+    required: true
+  enable_benchmark_intel_optimized3:
+    type: boolean
+    title: Add Intel Optimized3 Flex pool
+    description: Creates a dedicated amd64 benchmark pool using VM.Optimized3.Flex.
+    default: false
+    required: true
+  enable_benchmark_intel_acceleron:
+    type: boolean
+    title: Add Intel Acceleron pool
+    description: Creates a dedicated amd64 benchmark pool using VM.Standard4.Ax.Flex.
+    default: false
+    required: true
+  enable_benchmark_a4_acceleron:
+    type: boolean
+    title: Add Ampere A4 Acceleron pool
+    description: Creates a dedicated arm64 benchmark pool using VM.Standard.A4.Ax.Flex.
+    default: false
+    required: true
+  benchmark_amd64_node_image_id:
+    type: string
+    title: AMD and Intel OKE image OCID
+    description: Optional. Required only when an AMD or Intel benchmark pool is selected and the primary worker image is not amd64. The image must match the selected full Kubernetes version.
+    required: false
+  benchmark_arm64_node_image_id:
+    type: string
+    title: Ampere A4 OKE image OCID
+    description: Optional. Required only when an Ampere A4 benchmark pool is selected and the primary worker image is not arm64. The image must match the selected full Kubernetes version.
+    required: false
+  benchmark_pool_ocpus:
+    type: number
+    title: OCPUs per benchmark node
+    description: Applied consistently to every selected Flex profile for an equivalent comparison.
+    default: 4
+    required: true
+  benchmark_pool_memory_gbs:
+    type: number
+    title: Memory (GB) per benchmark node
+    description: Applied consistently to every selected Flex profile for an equivalent comparison.
+    default: 32
+    required: true
+  benchmark_pool_initial_size:
+    type: number
+    title: Initial nodes per benchmark pool
+    description: Number of nodes Terraform creates for each selected profile. Use at least two for the default host-spread benchmark.
+    default: 2
+    required: true
+  benchmark_pool_min_size:
+    type: number
+    title: Minimum nodes per benchmark pool
+    description: Lower capacity bound when benchmark-pool autoscaling is enabled. Use at least two for the default host-spread benchmark.
+    default: 2
+    required: true
+  benchmark_pool_max_size:
+    type: number
+    title: Maximum nodes per benchmark pool
+    description: Upper capacity bound when benchmark-pool autoscaling is enabled.
+    default: 4
+    required: true
+  benchmark_pool_max_pods_per_node:
+    type: number
+    title: Maximum Pods per benchmark node
+    description: VCN-native Pod limit for each selected benchmark pool. Confirm it is within the shape's VNIC capacity.
+    default: 31
+    required: true
+  enable_benchmark_cluster_autoscaler:
+    type: boolean
+    title: Enable benchmark-pool autoscaling
+    description: Installs the OKE Cluster Autoscaler add-on so each selected benchmark pool can scale only between its configured minimum and maximum node counts. Requires at least one dedicated benchmark pool.
+    default: false
+    required: true
+  create_benchmark_cluster_autoscaler_workload_identity_policy:
+    type: boolean
+    title: Create Cluster Autoscaler workload policy
+    description: Creates the condition-scoped policy that allows the OKE Cluster Autoscaler workload identity to resize the selected benchmark pools and their required compute and network resources.
+    default: true
+    required: true
+  benchmark_cluster_autoscaler_remove_resources_on_destroy:
+    type: boolean
+    title: Remove Cluster Autoscaler resources on destroy
+    description: Controls whether OKE removes the add-on's Kubernetes resources when this Terraform stack removes the Cluster Autoscaler add-on.
+    default: true
     required: true
   operator_shape:
     type: string
@@ -150,14 +336,20 @@ variables:
     required: false
   operator_shape_ocpus:
     type: number
+    title: Operator OCPUs
+    description: Used when the private operator runs on a Flex shape.
     default: 1
     required: true
   operator_shape_memory_gbs:
     type: number
+    title: Operator memory (GB)
+    description: Used when the private operator runs on a Flex shape.
     default: 8
     required: true
   operator_boot_volume_gbs:
     type: number
+    title: Operator boot volume (GB)
+    description: Storage for the private operator tools, image-build cache, and benchmark result summaries.
     default: 50
     required: true
   operator_image_id:
@@ -170,16 +362,99 @@ variables:
     title: Pinned Helm version
     default: v3.17.3
     required: true
+  operator_kubernetes_access_mode:
+    type: enum
+    title: Operator Kubernetes access mode
+    description: iam_admin grants the private operator cluster administration scoped to this cluster. namespace_rbac uses the generated namespace-scoped RoleBinding, which a Kubernetes administrator must apply once. Select iam_admin when Immutable result delivery is fss because the baseline creates a static cluster-scoped PersistentVolume.
+    enum:
+      - iam_admin
+      - namespace_rbac
+    default: iam_admin
+    required: true
+  operator_bootstrap_generation:
+    type: number
+    title: Operator bootstrap generation
+    description: Increment to intentionally replace the private operator VM after changing the runtime bundle or benchmark-profile configuration.
+    default: 1
+    required: true
+  create_operator_dynamic_group:
+    type: boolean
+    title: Create operator dynamic group
+    description: Creates the dynamic group that identifies the private operator instance principal.
+    default: true
+    required: true
+  operator_dynamic_group_ocid:
+    type: string
+    title: Existing operator dynamic group OCID
+    description: Required only when Create operator dynamic group is false and a selected policy or namespace_rbac mode needs to reference that group.
+    required: false
+  create_operator_cluster_access_policy:
+    type: boolean
+    title: Create operator cluster-access policy
+    description: Creates the policy that lets the private operator obtain and use the kubeconfig for this OKE cluster.
+    default: true
+    required: true
+  create_operator_bootstrap_bundle_read_policy:
+    type: boolean
+    title: Create operator bootstrap-bundle policy
+    description: Creates the policy that lets the private operator download its bootstrap bundle from Object Storage.
+    default: true
+    required: true
+  create_operator_results_read_policy:
+    type: boolean
+    title: Create operator results-read policy
+    description: Creates the policy that lets the private operator read simulation results from Object Storage. It applies only when Immutable result delivery is object_storage.
+    default: true
+    required: true
   kubernetes_namespace:
     type: string
+    title: Simulation namespace
+    description: Kubernetes namespace created for the runtime baseline and simulation Jobs.
     default: monte-carlo
     required: true
   service_account_name:
     type: string
+    title: Simulation ServiceAccount
+    description: Kubernetes identity used by simulation worker Pods.
     default: monte-carlo-runner
+    required: true
+  result_delivery_mode:
+    type: enum
+    title: Immutable result delivery
+    description: fss mounts a private OCI File Storage export into worker Pods and the operator. object_storage lets simulation jobs publish partial results to Object Storage with a scoped workload policy.
+    enum:
+      - object_storage
+      - fss
+    default: fss
+    required: true
+  fss_export_path:
+    type: string
+    title: FSS export path
+    description: NFS export path for private FSS result delivery. Used only when Immutable result delivery is fss.
+    default: /monte-carlo-results
+    required: false
+  fss_operator_mount_path:
+    type: string
+    title: FSS operator mount path
+    description: Private path used to mount the FSS result export on the operator VM. Used only when Immutable result delivery is fss.
+    default: /mnt/mcqs-results
+    required: false
+  fss_persistent_volume_capacity:
+    type: string
+    title: FSS PersistentVolume capacity
+    description: Kubernetes requires this capacity value for the static FSS PersistentVolume. OCI File Storage remains elastic and does not enforce it as a physical limit.
+    default: 50Gi
+    required: false
+  create_workload_object_storage_policy:
+    type: boolean
+    title: Create workload Object Storage policy
+    description: Creates the condition-scoped OKE Workload Identity policy that lets the configured Kubernetes ServiceAccount create result objects below the configured Object Storage prefix. It applies only when Immutable result delivery is object_storage.
+    default: true
     required: true
   object_storage_bucket_name:
     type: string
+    title: Result bucket name
+    description: Optional. Leave empty to create a name based on the resource prefix.
     required: false
   object_storage_prefix:
     type: string
@@ -194,9 +469,13 @@ variables:
     required: false
   kms_key_id:
     type: string
+    title: Vault key OCID
+    description: Optional customer-managed key for supported resources.
     required: false
   freeform_tags:
     type: string
+    title: Free-form tags
+    description: Optional. Leave empty when no additional free-form tags are required.
     required: false
 outputs:
   cluster_id:
@@ -207,6 +486,10 @@ outputs:
     title: OKE cluster name
   cluster_endpoint:
     title: Private Kubernetes API endpoint
+  cluster_private_api_ip:
+    title: Private Kubernetes API IP address
+  cluster_private_api_port:
+    title: Private Kubernetes API port
   operator_instance_id:
     title: Operator instance OCID
   operator_private_ip:
@@ -219,14 +502,26 @@ outputs:
     title: OCI Bastion OCID
   bastion_client_cidr:
     title: Allowed Bastion client CIDR
+  bastion_session_ttl_seconds:
+    title: Bastion session lifetime
   operator_session_create_command:
     title: Create operator SSH session
+  operator_rbac_bastion_session_create_command:
+    title: Create Kubernetes RBAC port-forwarding session
   node_pool_id:
     title: Node pool OCID
   node_shape:
     title: Selected node shape
   node_architecture:
     title: Selected node architecture
+  worker_subnet_id:
+    title: Private OKE worker subnet OCID
+  pod_subnet_id:
+    title: Private OKE pod subnet OCID
+  oke_internal_nsg_id:
+    title: OKE internal network security group OCID
+  fss_worker_client_nsg_id:
+    title: FSS worker-client network security group OCID
   operator_shape:
     title: Selected operator shape
   object_storage_bucket:
@@ -235,6 +530,16 @@ outputs:
     title: Object Storage namespace
   object_storage_prefix:
     title: Write-only result prefix
+  workload_object_storage_policy_created:
+    title: Workload results policy created
+  operator_dynamic_group_created:
+    title: Operator dynamic group created
+  operator_cluster_access_policy_created:
+    title: Operator cluster-access policy created
+  operator_bootstrap_bundle_read_policy_created:
+    title: Operator bootstrap-bundle policy created
+  operator_results_read_policy_created:
+    title: Operator results-read policy created
   container_repository_url:
     title: OCIR repository URL
   log_group_id:

@@ -37,6 +37,16 @@ printf 'OCI instance principal: ready\n'
 printf 'kubectl client: %s\n' "$(kubectl version --client --output=json | jq -r '.clientVersion.gitVersion')"
 printf 'Helm: %s\n' "$(helm version --short)"
 
+if [[ "${MCQS_RESULT_DELIVERY_MODE:-fss}" == "fss" ]]; then
+  MCQS_FSS_RESULTS_DIR="${MCQS_FSS_RESULTS_DIR:-}"
+  mcqs_require_value MCQS_FSS_RESULTS_DIR
+  mountpoint -q "$MCQS_FSS_RESULTS_DIR" || \
+    mcqs_fail "FSS result delivery is configured but ${MCQS_FSS_RESULTS_DIR} is not mounted. Run operator/doctor.sh."
+  printf 'Result delivery: FSS mounted at %s\n' "$MCQS_FSS_RESULTS_DIR"
+else
+  printf 'Result delivery: Object Storage\n'
+fi
+
 mcqs_note "Security prerequisites"
 cat <<'MESSAGE'
 Run simulation commands only from the private operator instance reached by an

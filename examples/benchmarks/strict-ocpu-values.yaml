@@ -1,0 +1,16 @@
+# Resource contract for the OCI-OCPU-normalized hardware benchmark.
+#
+# The benchmark wrapper uses this file together with exactly two dedicated
+# nodes and strict host spreading. Requests equal limits, so Kubernetes does
+# not place more benchmark CPU or memory on a node than the test declares.
+#
+# Two Kubernetes CPU units is the default allocation unit used by this
+# quickstart's OCPU-normalized comparison. The wrapper verifies it against
+# each selected node's actual allocatable capacity before submitting a Job.
+resources:
+  requests:
+    cpu: "2"
+    memory: "4Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
